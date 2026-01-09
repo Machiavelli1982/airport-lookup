@@ -1,92 +1,88 @@
-"use client";
+import Link from "next/link";
+import AirportSearch from "@/app/components/AirportSearch";
 
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+export const runtime = "nodejs";
 
-function normalizeCode(input: string) {
-  return input.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
-}
+const EXAMPLES = [
+  { code: "LOWW", label: "Vienna (LOWW)" },
+  { code: "LOWI", label: "Innsbruck (LOWI)" },
+  { code: "LOWG", label: "Graz (LOWG)" },
+  { code: "LOWK", label: "Klagenfurt (LOWK)" },
+  { code: "EDDF", label: "Frankfurt (EDDF)" },
+  { code: "LSZH", label: "Zürich (LSZH)" },
+];
 
 export default function Home() {
-  const router = useRouter();
-  const [codeRaw, setCodeRaw] = useState("");
-
-  const code = useMemo(() => normalizeCode(codeRaw), [codeRaw]);
-  const isValid = code.length === 3 || code.length === 4;
-
-  function go() {
-    if (!isValid) return;
-    router.push(`/airports/${code}`);
-  }
-
   return (
-    <main className="min-h-screen bg-white px-4 py-6">
-      <div className="mx-auto w-full max-w-md">
-        <header className="mb-6">
-          <h1 className="text-2xl font-semibold tracking-tight">Airport Lookup</h1>
-          <p className="mt-2 text-sm text-neutral-600">
-            Runways, frequencies & navaids. Reference only — not for real-world navigation.
-          </p>
-        </header>
+    <main className="mx-auto w-full max-w-5xl px-4 py-10">
+      {/* Hero */}
+      <section className="mb-8">
+        <h1 className="text-3xl font-semibold tracking-tight">Airport Lookup</h1>
+        <p className="mt-2 text-sm text-neutral-600">
+          Reference-only airport information (ICAO/IATA): runways (incl. lighting),
+          frequencies, and navaids. Not for real-world navigation.
+        </p>
+      </section>
 
-        <div className="rounded-2xl border border-neutral-200 p-4 shadow-sm">
-          <label className="text-sm font-medium text-neutral-900">
-            ICAO / IATA code
-          </label>
-
-          <div className="mt-2 flex gap-2">
-            <input
-              className="w-full rounded-xl border border-neutral-200 px-3 py-3 text-base outline-none focus:border-neutral-400"
-              placeholder="e.g. LOWW or EDDF"
-              inputMode="text"
-              autoCapitalize="characters"
-              autoCorrect="off"
-              value={codeRaw}
-              onChange={(e) => setCodeRaw(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") go();
-              }}
-            />
-            <button
-              type="button"
-              onClick={go}
-              disabled={!isValid}
-              className="shrink-0 rounded-xl bg-neutral-900 px-5 py-3 text-base font-medium text-white disabled:opacity-40"
-            >
-              Go
-            </button>
-          </div>
-
-          <p className="mt-2 text-xs text-neutral-600">
-            {isValid ? (
-              <>Will open: <span className="font-semibold">{code}</span></>
-            ) : (
-              <>Enter a 3- or 4-letter code (IATA/ICAO).</>
-            )}
-          </p>
-
-          <div className="mt-4 text-sm text-neutral-700">
-            Examples:
-            <div className="mt-2 flex flex-wrap gap-2">
-              {["LOWW", "EDDF", "EGLL", "KJFK"].map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => router.push(`/airports/${c}`)}
-                  className="rounded-full border border-neutral-200 px-3 py-2"
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-          </div>
+      {/* Search Card (Autocomplete bleibt in AirportSearch) */}
+      <section className="rounded-2xl border bg-white p-5 shadow-sm">
+        <div className="text-sm font-medium">ICAO or IATA code</div>
+        <div className="mt-3">
+          <AirportSearch />
         </div>
 
-        <footer className="mt-8 space-y-2 text-xs text-neutral-600">
-          <p>No official charts are hosted or embedded. We only link to official sources.</p>
-          <p>Data: OurAirports (Public Domain) — no guarantee of accuracy.</p>
-        </footer>
-      </div>
+        {/* Examples */}
+        <div className="mt-6">
+          <div className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
+            Examples
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {EXAMPLES.map((x) => (
+              <Link
+                key={x.code}
+                href={`/airports/${x.code}`}
+                className="rounded-full border bg-neutral-50 px-3 py-1.5 text-sm hover:bg-neutral-100"
+              >
+                {x.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Feature Cards */}
+      <section className="mt-8 grid gap-4 md:grid-cols-3">
+        <div className="rounded-2xl border bg-white p-5 shadow-sm">
+          <div className="text-sm font-semibold">Runways</div>
+          <p className="mt-1 text-sm text-neutral-600">
+            Length, surface, headings, closed status, and a clear runway lighting badge.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border bg-white p-5 shadow-sm">
+          <div className="text-sm font-semibold">Frequencies</div>
+          <p className="mt-1 text-sm text-neutral-600">
+            TWR / GND / ATIS / APP etc. shown as MHz, consistent formatting.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border bg-white p-5 shadow-sm">
+          <div className="text-sm font-semibold">Navaids</div>
+          <p className="mt-1 text-sm text-neutral-600">
+            VOR / NDB / DME with frequency/channel and position (where available).
+          </p>
+        </div>
+      </section>
+
+      {/* Transparency */}
+      <section className="mt-8 rounded-2xl border bg-neutral-50 p-5">
+        <div className="text-sm font-semibold">Transparency</div>
+        <p className="mt-1 text-sm text-neutral-700">
+          ILS is intentionally not displayed because it is incomplete/unreliable in the
+          current open dataset. For ILS and operational procedures, refer to official
+          AIP charts.
+        </p>
+      </section>
     </main>
   );
 }
