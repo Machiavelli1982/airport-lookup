@@ -1,46 +1,66 @@
+// web/app/sitemaps/airports/[n]/route.ts
+import { NextRequest } from "next/server";
 import { sql } from "@/lib/db";
 
 export const runtime = "nodejs";
-export const revalidate = 60 * 60 * 24;
+// optional: wenn du sicher dynamisch willst (z.B. bei DB-Latenz / Edge-Problemen):
+// export const dynamic = "force-dynamic";
 
+export const revalidate = 60 * 60 * 24; // 24h
 const CHUNK = 5000;
 
 function xmlEscape(s: string) {
-  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+  return s
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
 }
 
 export async function GET(
-  _req: Request,
-  { params }: { params: { n: string } }
+  req: NextRequest,
+  context: { params: Promise<{ n: string }> }
 ) {
-  const n = Math.max(1, Number(params.n || "1"));
-  const offset = (n - 1) * CHUNK;
+  const { n } = await context.params;
 
-  const rows = await sql/* sql */`
+  const chunkIndex = Math.max(1, Number.parseInt(n, 10) || 1);
+  const offset = (chunkIndex - 1) * CHUNK;
+
+  // Origin robust bestimmen
+  const origin =
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? req.nextUrl.origin;
+
+  // Airport-Idents holen (stabil sortiert)
+  const rows = await sql<{ ident: string }[]>`
     SELECT ident
     FROM airports
-    ORDER BY ident
+    WHERE ident IS NOT NULL AND ident <> ''
+    ORDER BY ident ASC
     LIMIT ${CHUNK} OFFSET ${offset};
   `;
 
-  const base = "https://airportlookup.com";
   const urls = rows
-    .map((r: any) => {
-      const code = encodeURIComponent(String(r.ident).toUpperCase());
-      return `<url><loc>${base}/a/${xmlEscape(code)}</loc></url>`;
+    .map((r) => r.ident?.trim().toUpperCase())
+    .filter(Boolean)
+    .map((ident) => {
+      // Ziel-URL laut deinem Plan: /a/{ident}
+      const loc = `${origin}/a/${encodeURIComponent(ident!)}`;
+      return `  <url><loc>${xmlEscape(loc)}</loc></url>`;
     })
-    .join("");
+    .join("\n");
 
-  const body = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls}
-</urlset>`;
+  const body =
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+    `${urls}\n` +
+    `</urlset>\n`;
 
   return new Response(body, {
     headers: {
       "content-type": "application/xml; charset=utf-8",
-      // optional: damit Crawler es auch als XML behandeln
-      "cache-control": "public, max-age=0, s-maxage=86400",
+      // optional: Vercel/CDN hint
+      "cache-control": "public, s-maxage=86400, stale-while-revalidate=3600",
     },
   });
 }
