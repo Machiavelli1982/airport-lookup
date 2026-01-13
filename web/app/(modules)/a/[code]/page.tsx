@@ -2,12 +2,20 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 
-
 export const revalidate = 86400; // 24h
 
+// null/undefined-safe string helpers
+function s(v: unknown): string {
+  return typeof v === "string" ? v : "";
+}
 
-function norm(code: string) {
-  return code.trim().toUpperCase();
+function norm(v: unknown): string {
+  return s(v).trim().toUpperCase();
+}
+
+function clean(v: unknown): string | null {
+  const t = s(v).trim();
+  return t.length ? t : null;
 }
 
 export async function generateMetadata({
@@ -27,14 +35,17 @@ export async function generateMetadata({
   const a = rows[0];
   if (!a) return { title: "Airport not found" };
 
-  const title = `${a.icao}${a.iata ? ` / ${a.iata}` : ""} – ${a.name}`;
-  const desc = `Quick airport reference for ${a.icao}${a.iata ? ` (${a.iata})` : ""}: runways, frequencies and key facts. Reference only – not for real-world navigation.`;
+  const icao = clean(a.icao) ?? code;
+  const iata = clean(a.iata);
+  const name = clean(a.name) ?? "Airport";
+  const title = `${icao}${iata ? ` / ${iata}` : ""} – ${name}`;
+  const desc = `Quick airport reference for ${icao}${iata ? ` (${iata})` : ""}: runways, frequencies and key facts. Reference only – not for real-world navigation.`;
 
   return {
     title,
     description: desc,
     robots: { index: true, follow: true },
-    alternates: { canonical: `/a/${a.icao}` },
+    alternates: { canonical: `/a/${icao}` },
   };
 }
 
@@ -51,9 +62,13 @@ export async function generateStaticParams() {
       ident
     LIMIT 2000;
   `;
-  return rows.map((r: any) => ({ code: r.ident }));
-}
 
+  // IMPORTANT: filter out null/empty idents to avoid params.code === undefined
+  return (rows as any[])
+    .map((r) => clean(r?.ident))
+    .filter((ident): ident is string => Boolean(ident))
+    .map((ident) => ({ code: ident }));
+}
 
 export default async function AirportSeoHub({
   params,
@@ -79,17 +94,26 @@ export default async function AirportSeoHub({
   const a = rows[0];
   if (!a) notFound();
 
+  const icao = clean(a.icao) ?? code;
+  const iata = clean(a.iata);
+  const name = clean(a.name) ?? "Airport";
+  const municipality = clean(a.municipality);
+  const isoCountry = clean(a.iso_country) ?? "";
+  const typeLabel = (clean(a.type) ?? "").replaceAll("_", " ");
+  const elevation = a.elevation_ft != null ? `${a.elevation_ft} ft` : null;
+
   return (
     <main className="mx-auto max-w-2xl px-4 py-6">
       <header className="mb-4">
         <h1 className="text-xl font-semibold">
-          {a.icao}
-          {a.iata ? ` / ${a.iata}` : ""} – {a.name}
+          {icao}
+          {iata ? ` / ${iata}` : ""} – {name}
         </h1>
         <p className="text-sm text-muted-foreground">
-          {a.municipality ? `${a.municipality}, ` : ""}
-          {a.iso_country} · {a.type.replaceAll("_", " ")}
-          {a.elevation_ft != null ? ` · ${a.elevation_ft} ft` : ""}
+          {municipality ? `${municipality}, ` : ""}
+          {isoCountry}
+          {typeLabel ? ` · ${typeLabel}` : ""}
+          {elevation ? ` · ${elevation}` : ""}
         </p>
         <p className="mt-2 text-xs text-muted-foreground">
           Reference only – not for real-world navigation.
@@ -97,13 +121,22 @@ export default async function AirportSeoHub({
       </header>
 
       <section className="grid gap-2">
-        <Link className="rounded-md border p-3 hover:bg-muted" href={`/a/${a.icao}/runways`}>
+        <Link
+          className="rounded-md border p-3 hover:bg-muted"
+          href={`/a/${icao}/runways`}
+        >
           Runways
         </Link>
-        <Link className="rounded-md border p-3 hover:bg-muted" href={`/a/${a.icao}/frequencies`}>
+        <Link
+          className="rounded-md border p-3 hover:bg-muted"
+          href={`/a/${icao}/frequencies`}
+        >
           Frequencies
         </Link>
-        <Link className="rounded-md border p-3 hover:bg-muted" href={`/airports/${a.icao}`}>
+        <Link
+          className="rounded-md border p-3 hover:bg-muted"
+          href={`/airports/${icao}`}
+        >
           Open full airport page
         </Link>
       </section>
