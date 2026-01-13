@@ -1,3 +1,4 @@
+// web/app/components/AirportSearch.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -18,12 +19,14 @@ export default function AirportSearch() {
   const [q, setQ] = useState("");
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
+  const [touched, setTouched] = useState(false);
 
   const canSearch = useMemo(() => q.trim().length >= 2, [q]);
 
   useEffect(() => {
     if (!canSearch) {
       setItems([]);
+      setLoading(false);
       return;
     }
 
@@ -37,11 +40,11 @@ export default function AirportSearch() {
         const data = await res.json();
         setItems(data.items ?? []);
       } catch {
-        // ignore abort/errors for now
+        // ignore abort/errors
       } finally {
         setLoading(false);
       }
-    }, 200); // debounce
+    }, 200);
 
     return () => {
       ctrl.abort();
@@ -51,11 +54,19 @@ export default function AirportSearch() {
 
   return (
     <div className="w-full max-w-xl">
-      <label className="block text-sm font-medium mb-2">ICAO / IATA</label>
+      <label className="block text-sm font-medium mb-2">
+        Search airport (ICAO / IATA / city / name)
+      </label>
+
       <input
         value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder="e.g. LOWW, EDDF, JFK…"
+        onChange={(e) => {
+          setQ(e.target.value);
+          if (!touched) setTouched(true);
+        }}
+        placeholder="Examples: LOWW, VIE, Vienna, Frankfurt…"
+        inputMode="search"
+        autoComplete="off"
         className="w-full rounded-xl border px-4 py-3 text-base"
       />
 
@@ -70,21 +81,30 @@ export default function AirportSearch() {
                 href={`/airports/${encodeURIComponent(a.icao)}`}
                 className="block px-4 py-3 hover:bg-black/5"
               >
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold">{a.icao}</span>
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="font-semibold shrink-0">{a.icao}</span>
+
                   {a.iata && (
-                    <span className="text-xs rounded-md border px-2 py-0.5">
+                    <span className="text-xs rounded-md border px-2 py-0.5 shrink-0">
                       {a.iata}
                     </span>
                   )}
-                  <span className="text-sm opacity-80">{a.type}</span>
+
+                  {/* type can get long; prevent horizontal overflow */}
+                  {a.type && (
+                    <span className="text-sm opacity-80 truncate min-w-0">
+                      {a.type}
+                    </span>
+                  )}
                 </div>
-                <div className="text-sm">
-                  {a.name}
+
+                <div className="text-sm min-w-0">
+                  <span className="block truncate">{a.name}</span>
+
                   {(a.municipality || a.iso_country) && (
-                    <span className="opacity-70">
-                      {" "}
-                      — {a.municipality ?? ""}{" "}
+                    <span className="block opacity-70 truncate">
+                      {a.municipality ?? ""}
+                      {a.municipality && a.iso_country ? " " : ""}
                       {a.iso_country ? `(${a.iso_country})` : ""}
                     </span>
                   )}
@@ -94,8 +114,14 @@ export default function AirportSearch() {
           </div>
         )}
 
-        {!loading && canSearch && items.length === 0 && (
+        {!loading && touched && canSearch && items.length === 0 && (
           <div className="text-sm opacity-70">No matches.</div>
+        )}
+
+        {!loading && !canSearch && (
+          <div className="text-sm opacity-70">
+            Type at least 2 characters to search.
+          </div>
         )}
       </div>
     </div>
