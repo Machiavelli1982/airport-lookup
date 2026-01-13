@@ -13,7 +13,7 @@ export async function GET(
   _req: Request,
   { params }: { params: { n: string } }
 ) {
-  const n = Math.max(1, Number(params.n || 1));
+  const n = Math.max(1, Number(params.n || "1"));
   const offset = (n - 1) * CHUNK;
 
   const rows = await sql/* sql */`
