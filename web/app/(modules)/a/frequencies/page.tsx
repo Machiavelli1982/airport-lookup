@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 
-export const runtime = "nodejs";
+
 export const revalidate = 60 * 60 * 24;
 
 function norm(code: string) {
