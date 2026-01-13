@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 
 
-export const revalidate = 60 * 60 * 24;
+export const revalidate = 86400;
+
 
 function norm(code: string) {
   return code.trim().toUpperCase();
