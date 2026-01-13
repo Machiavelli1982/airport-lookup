@@ -370,81 +370,122 @@ export default async function AirportPage(props: any) {
           subtitle="At-a-glance sim reference (runway, elevation, comm)."
         >
           <div style={{ display: "grid", gap: 10, minWidth: 0 }}>
-            {/* Runway Summary */}
+{/* Runway Summary */}
+<div
+  style={{
+    border: "1px solid var(--border)",
+    borderRadius: 14,
+    padding: 12,
+    background: "rgba(255,255,255,0.03)",
+    minWidth: 0,
+  }}
+>
+  <div
+    style={{
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "baseline",
+      gap: 12,
+      flexWrap: "wrap",
+      minWidth: 0,
+    }}
+  >
+    <div
+      style={{
+        fontWeight: 700,
+        color: "var(--muted)",
+        flex: "1 1 160px",
+        minWidth: 0,
+      }}
+    >
+      Runway Summary
+    </div>
+
+    <div
+      style={{
+        display: "flex",
+        gap: 8,
+        flexWrap: "wrap",
+        justifyContent: "flex-end",
+        flex: "0 0 auto",
+        maxWidth: "100%",
+      }}
+    >
+      {lightingBadge ? (
+        <Badge text={lightingBadge.text} tone={lightingBadge.tone} />
+      ) : null}
+      {closedBadge ? (
+        <Badge text={closedBadge.text} tone={closedBadge.tone} />
+      ) : null}
+    </div>
+  </div>
+
+  {runways.length === 0 ? (
+    <div style={{ marginTop: 6, color: "var(--muted)", fontWeight: 600 }}>
+      No runway data available.
+    </div>
+  ) : (
+    <div style={{ marginTop: 8, display: "grid", gap: 6, minWidth: 0 }}>
+      {runways.map((r: any) => {
+        const lighted = asBool(r.lighted);
+        const closed = asBool(r.closed);
+
+        return (
+          <div
+            key={r.id}
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+              gap: 10,
+              flexWrap: "wrap",
+              minWidth: 0,
+            }}
+          >
             <div
               style={{
-                border: "1px solid var(--border)",
-                borderRadius: 14,
-                padding: 12,
-                background: "rgba(255,255,255,0.03)",
                 minWidth: 0,
+                flex: "1 1 240px",
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
+                fontWeight: 700,
               }}
             >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "baseline",
-                  gap: 12,
-                  flexWrap: "wrap",
-                  minWidth: 0,
-                }}
-              >
-                <div
-                  style={{
-                    fontWeight: 700,
-                    color: "var(--muted)",
-                    flex: "1 1 160px",
-                    minWidth: 0,
-                  }}
-                >
-                  Runway Summary
-                </div>
-
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 8,
-                    flexWrap: "wrap",
-                    justifyContent: "flex-end",
-                    flex: "0 0 auto",
-                    maxWidth: "100%",
-                  }}
-                >
-                  {lightingBadge ? (
-                    <Badge text={lightingBadge.text} tone={lightingBadge.tone} />
-                  ) : null}
-                  {closedBadge ? (
-                    <Badge text={closedBadge.text} tone={closedBadge.tone} />
-                  ) : null}
-                </div>
-              </div>
-
-              <div
-                style={{
-                  marginTop: 6,
-                  fontSize: 20,
-                  fontWeight: 700,
-                  minWidth: 0,
-                  overflowWrap: "anywhere",
-                }}
-              >
-                {longest ? (
-                  <>
-                    {longest.le_ident ?? "—"} / {longest.he_ident ?? "—"}{" "}
-                    <span style={{ color: "var(--muted)", fontWeight: 600 }}>
-                      ·{" "}
-                      {longest.length_ft
-                        ? `${longest.length_ft} ft / ${fmtMFromFt(longest.length_ft)}`
-                        : "—"}{" "}
-                      · {longest.surface ?? "—"}
-                    </span>
-                  </>
-                ) : (
-                  <span style={{ color: "var(--muted)" }}>—</span>
-                )}
-              </div>
+              {r.le_ident ?? "—"} / {r.he_ident ?? "—"}
+              <span style={{ color: "var(--muted)", fontWeight: 600 }}>
+                {" "}
+                ·{" "}
+                {r.length_ft
+                  ? `${r.length_ft} ft / ${fmtMFromFt(r.length_ft)}`
+                  : "—"}{" "}
+                · {r.surface ?? "—"}
+              </span>
             </div>
+
+            <div
+              style={{
+                display: "flex",
+                gap: 6,
+                flexWrap: "wrap",
+                justifyContent: "flex-end",
+                flex: "0 0 auto",
+                maxWidth: "100%",
+              }}
+            >
+              {closed ? <Badge text="CLOSED" tone="warn" /> : null}
+              {lighted ? (
+                <Badge text="LIGHTED" tone="ok" />
+              ) : (
+                <Badge text="UNLIT" tone="muted" />
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  )}
+</div>
+
 
             {/* Elevation */}
             <div
