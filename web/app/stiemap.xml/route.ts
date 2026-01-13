@@ -20,7 +20,8 @@ export async function GET() {
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${Array.from({ length: parts }).map((_, i) => {
   const n = i + 1;
-  return `<sitemap><loc>${base}/sitemaps/airports/${n}.xml</loc></sitemap>`;
+return `<sitemap><loc>${base}/sitemaps/airports/${n}</loc></sitemap>`;
+
 
 }).join("")}
 </sitemapindex>`;

@@ -37,6 +37,10 @@ ${urls}
 </urlset>`;
 
   return new Response(body, {
-    headers: { "content-type": "application/xml; charset=utf-8" },
+    headers: {
+      "content-type": "application/xml; charset=utf-8",
+      // optional: damit Crawler es auch als XML behandeln
+      "cache-control": "public, max-age=0, s-maxage=86400",
+    },
   });
 }
