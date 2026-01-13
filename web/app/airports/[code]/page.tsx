@@ -7,6 +7,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
+/* ----------------------------- helpers ----------------------------- */
+
 function norm(input: unknown) {
   return String(input ?? "").trim().toUpperCase();
 }
@@ -16,6 +18,10 @@ function codeFromOriginalUri(originalUri: string | null) {
   const path = originalUri.split("?")[0] || "";
   const m = path.match(/^\/airports\/([^/]+)$/i);
   return m ? norm(decodeURIComponent(m[1])) : "";
+}
+
+function isNonEmpty(s: any) {
+  return typeof s === "string" && s.trim().length > 0;
 }
 
 function fmtCoord(n: any) {
@@ -36,122 +42,11 @@ function fmtMFromFt(n: any) {
   return `${Math.round(x * 0.3048)} m`;
 }
 
-function isNonEmpty(s: any) {
-  return typeof s === "string" && s.trim().length > 0;
-}
-
 function googleMapsLink(lat: any, lon: any) {
   const la = Number(lat);
   const lo = Number(lon);
   if (!Number.isFinite(la) || !Number.isFinite(lo)) return null;
   return `https://www.google.com/maps?q=${la},${lo}`;
-}
-
-function Badge(props: { text: string; tone?: "ok" | "muted" | "warn" }) {
-  const tone = props.tone ?? "muted";
-  const bg =
-    tone === "ok"
-      ? "rgba(34,197,94,0.14)"
-      : tone === "warn"
-      ? "rgba(245,158,11,0.16)"
-      : "rgba(255,255,255,0.10)";
-  const fg =
-    tone === "ok"
-      ? "rgba(34,197,94,1)"
-      : tone === "warn"
-      ? "rgba(245,158,11,1)"
-      : "var(--muted)";
-
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        padding: "4px 10px",
-        borderRadius: 999,
-        fontSize: 12,
-        fontWeight: 800,
-        background: bg,
-        color: fg,
-        border: "1px solid var(--border)",
-        letterSpacing: 0.2,
-        // safety for tiny screens
-        maxWidth: "100%",
-      }}
-    >
-      {props.text}
-    </span>
-  );
-}
-
-function Card(props: { title: string; subtitle?: string; children?: any }) {
-  return (
-    <section
-      style={{
-        background: "var(--card)",
-        border: "1px solid var(--border)",
-        borderRadius: 18,
-        padding: 18,
-        boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
-        // IMPORTANT: allow shrinking inside grid to avoid overflow on mobile
-        minWidth: 0,
-        maxWidth: "100%",
-      }}
-    >
-      <h2 style={{ fontSize: 22, margin: 0, color: "var(--foreground)" }}>
-        {props.title}
-      </h2>
-      {props.subtitle ? (
-        <p style={{ margin: "6px 0 0", color: "var(--muted)" }}>
-          {props.subtitle}
-        </p>
-      ) : null}
-      {props.children ? <div style={{ marginTop: 14, minWidth: 0 }}>{props.children}</div> : null}
-    </section>
-  );
-}
-
-/**
- * KV rows were a main source of "gequetscht" layout on phones because the key had a hard 170px.
- * This version keeps the two-column look on larger screens, but on mobile it can shrink and wrap cleanly.
- */
-function KV(props: { k: string; v: any }) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        gap: 10,
-        padding: "6px 0",
-        flexWrap: "wrap",
-        // allow flex items to shrink inside grid/cards
-        minWidth: 0,
-      }}
-    >
-      <div
-        style={{
-          // was fixed 170px → too wide on small screens
-          flex: "0 1 min(170px, 42vw)",
-          color: "var(--muted)",
-          maxWidth: "100%",
-        }}
-      >
-        {props.k}
-      </div>
-      <div
-        style={{
-          fontWeight: 600,
-          color: "var(--foreground)",
-          // allow long tokens (URLs, coords, etc.) to wrap instead of forcing width
-          minWidth: 0,
-          flex: "1 1 220px",
-          overflowWrap: "anywhere",
-          wordBreak: "break-word",
-        }}
-      >
-        {props.v ?? "—"}
-      </div>
-    </div>
-  );
 }
 
 function fmtFreqMHz(mhz: any) {
@@ -171,6 +66,7 @@ function fmtNavaidFreq(freq_khz: any) {
 function pickPrimaryFrequency(frequencies: any[]) {
   if (!frequencies?.length) return null;
 
+  // Sim-friendly: "first thing you'd try" (still reference-only)
   const priority = ["TWR", "CTAF", "UNICOM", "AFIS", "GND", "APP", "DEP", "ATIS"];
 
   const rank = (t: any) => {
@@ -188,6 +84,125 @@ function pickPrimaryFrequency(frequencies: any[]) {
 
   return sorted[0] ?? null;
 }
+
+const asBool = (v: any) => v === true || v === 1 || v === "1";
+
+/* ------------------------------ UI bits ---------------------------- */
+
+function Badge(props: { text: string; tone?: "ok" | "muted" | "warn" }) {
+  const tone = props.tone ?? "muted";
+  const bg =
+    tone === "ok"
+      ? "rgba(34,197,94,0.14)"
+      : tone === "warn"
+      ? "rgba(245,158,11,0.16)"
+      : "rgba(255,255,255,0.08)";
+  const fg =
+    tone === "ok"
+      ? "rgba(34,197,94,1)"
+      : tone === "warn"
+      ? "rgba(245,158,11,1)"
+      : "var(--muted)";
+
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        padding: "4px 10px",
+        borderRadius: 999,
+        fontSize: 12,
+        fontWeight: 700,
+        background: bg,
+        color: fg,
+        border: "1px solid var(--border)",
+        letterSpacing: 0.2,
+        maxWidth: "100%",
+      }}
+    >
+      {props.text}
+    </span>
+  );
+}
+
+function Card(props: { title: string; subtitle?: string; children?: any }) {
+  return (
+    <section
+      style={{
+        background: "var(--card)",
+        border: "1px solid var(--border)",
+        borderRadius: 18,
+        padding: 18,
+        boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
+        minWidth: 0,
+        maxWidth: "100%",
+      }}
+    >
+      <h2 style={{ fontSize: 22, margin: 0, color: "var(--foreground)", fontWeight: 700 }}>
+        {props.title}
+      </h2>
+      {props.subtitle ? (
+        <p style={{ margin: "6px 0 0", color: "var(--muted)", fontWeight: 500 }}>
+          {props.subtitle}
+        </p>
+      ) : null}
+      {props.children ? (
+        <div style={{ marginTop: 14, minWidth: 0 }}>{props.children}</div>
+      ) : null}
+    </section>
+  );
+}
+
+/**
+ * Mobile-stable KV row: key can shrink; value wraps long tokens.
+ */
+function KV(props: { k: string; v: any }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: 10,
+        padding: "6px 0",
+        flexWrap: "wrap",
+        minWidth: 0,
+      }}
+    >
+      <div
+        style={{
+          flex: "0 1 min(170px, 42vw)",
+          color: "var(--muted)",
+          maxWidth: "100%",
+          fontWeight: 600,
+        }}
+      >
+        {props.k}
+      </div>
+      <div
+        style={{
+          fontWeight: 600,
+          color: "var(--foreground)",
+          minWidth: 0,
+          flex: "1 1 220px",
+          overflowWrap: "anywhere",
+          wordBreak: "break-word",
+        }}
+      >
+        {props.v ?? "—"}
+      </div>
+    </div>
+  );
+}
+
+const linkStyle: React.CSSProperties = {
+  fontWeight: 600,
+  color: "var(--foreground)",
+  overflowWrap: "anywhere",
+  wordBreak: "break-word",
+  display: "inline-block",
+  maxWidth: "100%",
+};
+
+/* ------------------------------ page ------------------------------- */
 
 export default async function AirportPage(props: any) {
   const p = await props?.params;
@@ -277,27 +292,32 @@ export default async function AirportPage(props: any) {
 
   const mapsUrl = googleMapsLink(airport.latitude_deg, airport.longitude_deg);
 
-  // Key Facts
-  const longest = runways?.[0] ?? null;
   const primaryFreq = pickPrimaryFrequency(frequencies);
-
-  const isLighted = (r: any) => String(r?.lighted) === "1" || r?.lighted === true;
-  const isClosed = (r: any) => String(r?.closed) === "1" || r?.closed === true;
+  const longest = runways?.[0] ?? null;
 
   const showGps =
     isNonEmpty(airport.gps_code) && norm(airport.gps_code) !== norm(airport.ident);
 
   const associatedTop = (navaids ?? []).slice(0, 3);
 
-  const linkStyle = {
-    fontWeight: 700,
-    color: "var(--foreground)",
-    // IMPORTANT: long URLs must wrap on mobile
-    overflowWrap: "anywhere" as const,
-    wordBreak: "break-word" as const,
-    display: "inline-block",
-    maxWidth: "100%",
-  };
+  // Lighting summary (sim reference)
+  const totalRunways = runways.length;
+  const lightedCount = runways.filter((r: any) => asBool(r.lighted)).length;
+  const closedCount = runways.filter((r: any) => asBool(r.closed)).length;
+
+  const lightingBadge =
+    totalRunways === 0
+      ? null
+      : lightedCount > 0
+      ? { text: `LIGHTED ${lightedCount}/${totalRunways}`, tone: "ok" as const }
+      : { text: "UNLIT (per dataset)", tone: "muted" as const };
+
+  const closedBadge =
+    totalRunways === 0
+      ? null
+      : closedCount > 0
+      ? { text: `CLOSED ${closedCount}`, tone: "warn" as const }
+      : null;
 
   return (
     <main
@@ -306,7 +326,6 @@ export default async function AirportPage(props: any) {
         maxWidth: 720,
         margin: "0 auto",
         fontFamily: "system-ui",
-        // IMPORTANT: allow children to shrink; prevents grid overflow weirdness
         minWidth: 0,
       }}
     >
@@ -316,9 +335,8 @@ export default async function AirportPage(props: any) {
           style={{
             color: "var(--foreground)",
             textDecoration: "none",
-            fontWeight: 700,
+            fontWeight: 600,
             opacity: 0.9,
-            // safety for narrow screens
             maxWidth: "100%",
             overflowWrap: "anywhere",
           }}
@@ -332,14 +350,14 @@ export default async function AirportPage(props: any) {
           fontSize: 44,
           letterSpacing: -0.5,
           margin: "8px 0 6px",
-          // prevent giant header from forcing width
           maxWidth: "100%",
           overflowWrap: "anywhere",
+          fontWeight: 700,
         }}
       >
         {airport.ident}
       </h1>
-      <p style={{ margin: 0, fontSize: 18, color: "var(--muted)", maxWidth: "100%" }}>
+      <p style={{ margin: 0, fontSize: 18, color: "var(--muted)", fontWeight: 500 }}>
         Reference only — not for real-world navigation.
       </p>
 
@@ -347,8 +365,12 @@ export default async function AirportPage(props: any) {
 
       <div style={{ display: "grid", gap: 14, minWidth: 0 }}>
         {/* Key Facts */}
-        <Card title="Key Facts" subtitle="At-a-glance sim reference (runway, elevation, primary comm).">
+        <Card
+          title="Key Facts"
+          subtitle="At-a-glance sim reference (runway, elevation, comm)."
+        >
           <div style={{ display: "grid", gap: 10, minWidth: 0 }}>
+            {/* Runway Summary */}
             <div
               style={{
                 border: "1px solid var(--border)",
@@ -368,7 +390,14 @@ export default async function AirportPage(props: any) {
                   minWidth: 0,
                 }}
               >
-                <div style={{ fontWeight: 800, color: "var(--muted)", flex: "1 1 160px", minWidth: 0 }}>
+                <div
+                  style={{
+                    fontWeight: 700,
+                    color: "var(--muted)",
+                    flex: "1 1 160px",
+                    minWidth: 0,
+                  }}
+                >
                   Runway Summary
                 </div>
 
@@ -382,15 +411,28 @@ export default async function AirportPage(props: any) {
                     maxWidth: "100%",
                   }}
                 >
-                  {/* your badges / status here */}
+                  {lightingBadge ? (
+                    <Badge text={lightingBadge.text} tone={lightingBadge.tone} />
+                  ) : null}
+                  {closedBadge ? (
+                    <Badge text={closedBadge.text} tone={closedBadge.tone} />
+                  ) : null}
                 </div>
               </div>
 
-              <div style={{ marginTop: 6, fontSize: 20, fontWeight: 900, minWidth: 0, overflowWrap: "anywhere" }}>
+              <div
+                style={{
+                  marginTop: 6,
+                  fontSize: 20,
+                  fontWeight: 700,
+                  minWidth: 0,
+                  overflowWrap: "anywhere",
+                }}
+              >
                 {longest ? (
                   <>
                     {longest.le_ident ?? "—"} / {longest.he_ident ?? "—"}{" "}
-                    <span style={{ color: "var(--muted)", fontWeight: 700 }}>
+                    <span style={{ color: "var(--muted)", fontWeight: 600 }}>
                       ·{" "}
                       {longest.length_ft
                         ? `${longest.length_ft} ft / ${fmtMFromFt(longest.length_ft)}`
@@ -404,6 +446,7 @@ export default async function AirportPage(props: any) {
               </div>
             </div>
 
+            {/* Elevation */}
             <div
               style={{
                 border: "1px solid var(--border)",
@@ -413,15 +456,16 @@ export default async function AirportPage(props: any) {
                 minWidth: 0,
               }}
             >
-              <div style={{ fontWeight: 800, color: "var(--muted)" }}>Field Elevation</div>
-              <div style={{ marginTop: 6, fontSize: 20, fontWeight: 900, minWidth: 0 }}>
+              <div style={{ fontWeight: 700, color: "var(--muted)" }}>Field Elevation</div>
+              <div style={{ marginTop: 6, fontSize: 20, fontWeight: 700, minWidth: 0 }}>
                 {fmtFt(airport.elevation_ft)}{" "}
-                <span style={{ color: "var(--muted)", fontWeight: 700 }}>
+                <span style={{ color: "var(--muted)", fontWeight: 600 }}>
                   / {fmtMFromFt(airport.elevation_ft)}
                 </span>
               </div>
             </div>
 
+            {/* Primary Frequency */}
             <div
               style={{
                 border: "1px solid var(--border)",
@@ -431,13 +475,13 @@ export default async function AirportPage(props: any) {
                 minWidth: 0,
               }}
             >
-              <div style={{ fontWeight: 800, color: "var(--muted)" }}>
+              <div style={{ fontWeight: 700, color: "var(--muted)" }}>
                 Primary / Contact Frequency
               </div>
 
               {primaryFreq ? (
                 <>
-                  <div style={{ marginTop: 6, fontSize: 20, fontWeight: 900, minWidth: 0 }}>
+                  <div style={{ marginTop: 6, fontSize: 20, fontWeight: 700, minWidth: 0 }}>
                     {String(primaryFreq.type ?? "—").toUpperCase()}{" "}
                     {fmtFreqMHz(primaryFreq.frequency_mhz)}
                   </div>
@@ -445,7 +489,7 @@ export default async function AirportPage(props: any) {
                     style={{
                       marginTop: 4,
                       color: "var(--muted)",
-                      fontWeight: 700,
+                      fontWeight: 600,
                       minWidth: 0,
                       overflowWrap: "anywhere",
                       wordBreak: "break-word",
@@ -455,12 +499,13 @@ export default async function AirportPage(props: any) {
                   </div>
                 </>
               ) : (
-                <div style={{ marginTop: 6, color: "var(--muted)", fontWeight: 700 }}>
+                <div style={{ marginTop: 6, color: "var(--muted)", fontWeight: 600 }}>
                   No comm frequency in dataset.
                 </div>
               )}
             </div>
 
+            {/* Associated Navaids (top 3) */}
             <div
               style={{
                 border: "1px solid var(--border)",
@@ -470,15 +515,15 @@ export default async function AirportPage(props: any) {
                 minWidth: 0,
               }}
             >
-              <div style={{ fontWeight: 800, color: "var(--muted)" }}>
+              <div style={{ fontWeight: 700, color: "var(--muted)" }}>
                 Associated Navaids{" "}
-                <span style={{ fontWeight: 700, color: "var(--foreground)" }}>
+                <span style={{ fontWeight: 600, color: "var(--foreground)" }}>
                   (reference only)
                 </span>
               </div>
 
               {associatedTop.length === 0 ? (
-                <div style={{ marginTop: 6, color: "var(--muted)", fontWeight: 700 }}>
+                <div style={{ marginTop: 6, color: "var(--muted)", fontWeight: 600 }}>
                   No associated navaids in dataset.
                 </div>
               ) : (
@@ -503,14 +548,14 @@ export default async function AirportPage(props: any) {
                           wordBreak: "break-word",
                         }}
                       >
-                        <span style={{ fontWeight: 900, color: "var(--foreground)" }}>
+                        <span style={{ fontWeight: 700, color: "var(--foreground)" }}>
                           {n.ident ?? "—"}
                         </span>{" "}
-                        <span style={{ color: "var(--muted)", fontWeight: 800 }}>
+                        <span style={{ color: "var(--muted)", fontWeight: 600 }}>
                           · {n.type ?? "—"}
                         </span>
                         {n.name ? (
-                          <span style={{ color: "var(--muted)", fontWeight: 700 }}>
+                          <span style={{ color: "var(--muted)", fontWeight: 500 }}>
                             {" "}
                             · {n.name}
                           </span>
@@ -519,7 +564,7 @@ export default async function AirportPage(props: any) {
 
                       <div
                         style={{
-                          fontWeight: 900,
+                          fontWeight: 700,
                           color: "var(--muted)",
                           whiteSpace: "nowrap",
                           flex: "0 0 auto",
@@ -545,6 +590,7 @@ export default async function AirportPage(props: any) {
           <KV k="Country" v={airport.iso_country ?? "—"} />
           <KV k="Region" v={airport.iso_region ?? "—"} />
           <KV k="Continent" v={airport.continent ?? "—"} />
+
           <KV
             k="Coordinates"
             v={
@@ -570,10 +616,10 @@ export default async function AirportPage(props: any) {
                     style={{
                       display: "inline-block",
                       color: "var(--muted)",
-                      // was hard 170px → shrink on mobile
                       width: "min(170px, 42vw)",
                       maxWidth: "100%",
                       verticalAlign: "top",
+                      fontWeight: 600,
                     }}
                   >
                     Wikipedia
@@ -592,6 +638,7 @@ export default async function AirportPage(props: any) {
                       width: "min(170px, 42vw)",
                       maxWidth: "100%",
                       verticalAlign: "top",
+                      fontWeight: 600,
                     }}
                   >
                     Website
@@ -613,23 +660,28 @@ export default async function AirportPage(props: any) {
                 minWidth: 0,
                 overflowWrap: "anywhere",
                 wordBreak: "break-word",
+                fontWeight: 500,
               }}
             >
-              <strong style={{ color: "var(--foreground)" }}>Keywords:</strong>{" "}
+              <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>
+                Keywords:
+              </strong>{" "}
               {airport.keywords}
             </div>
           )}
         </Card>
 
         {/* Runways */}
-        <Card title="Runways" subtitle="Runway list (length, surface, heading).">
+        <Card title="Runways" subtitle="Runway list (length, surface, heading, lights).">
           {runways.length === 0 ? (
-            <p style={{ margin: 0, color: "var(--muted)" }}>No runway records found.</p>
+            <p style={{ margin: 0, color: "var(--muted)", fontWeight: 500 }}>
+              No runway records found.
+            </p>
           ) : (
             <div style={{ display: "grid", gap: 10, minWidth: 0 }}>
               {runways.map((r: any) => {
-                const lighted = isLighted(r);
-                const closed = isClosed(r);
+                const lighted = asBool(r.lighted);
+                const closed = asBool(r.closed);
 
                 return (
                   <div
@@ -652,7 +704,14 @@ export default async function AirportPage(props: any) {
                         minWidth: 0,
                       }}
                     >
-                      <div style={{ fontWeight: 900, minWidth: 0, flex: "1 1 140px", overflowWrap: "anywhere" }}>
+                      <div
+                        style={{
+                          fontWeight: 700,
+                          minWidth: 0,
+                          flex: "1 1 140px",
+                          overflowWrap: "anywhere",
+                        }}
+                      >
                         {r.le_ident ?? "—"} / {r.he_ident ?? "—"}
                       </div>
 
@@ -666,11 +725,12 @@ export default async function AirportPage(props: any) {
                           maxWidth: "100%",
                         }}
                       >
-                        {/* keep your badges here */}
-                        {/* Example:
                         {closed ? <Badge text="CLOSED" tone="warn" /> : null}
-                        {lighted ? <Badge text="LIGHTED" tone="ok" /> : <Badge text="UNLIT" tone="muted" />}
-                        */}
+                        {lighted ? (
+                          <Badge text="LIGHTED" tone="ok" />
+                        ) : (
+                          <Badge text="UNLIT (dataset)" tone="muted" />
+                        )}
                       </div>
                     </div>
 
@@ -678,7 +738,7 @@ export default async function AirportPage(props: any) {
                       style={{
                         color: "var(--muted)",
                         marginTop: 6,
-                        fontWeight: 700,
+                        fontWeight: 600,
                         minWidth: 0,
                         overflowWrap: "anywhere",
                         wordBreak: "break-word",
@@ -698,7 +758,9 @@ export default async function AirportPage(props: any) {
         {/* Frequencies */}
         <Card title="Frequencies" subtitle="TWR, GND, ATIS, APP, etc.">
           {frequencies.length === 0 ? (
-            <p style={{ margin: 0, color: "var(--muted)" }}>No frequency records found.</p>
+            <p style={{ margin: 0, color: "var(--muted)", fontWeight: 500 }}>
+              No frequency records found.
+            </p>
           ) : (
             <div style={{ display: "grid", gap: 10, minWidth: 0 }}>
               {frequencies.map((f: any) => (
@@ -725,11 +787,11 @@ export default async function AirportPage(props: any) {
                       wordBreak: "break-word",
                     }}
                   >
-                    <div style={{ fontWeight: 900, color: "var(--foreground)" }}>
+                    <div style={{ fontWeight: 700, color: "var(--foreground)" }}>
                       {String(f.type ?? "—").toUpperCase()}
                     </div>
                     {f.description ? (
-                      <div style={{ color: "var(--muted)", fontWeight: 700, marginTop: 4 }}>
+                      <div style={{ color: "var(--muted)", fontWeight: 500, marginTop: 4 }}>
                         {f.description}
                       </div>
                     ) : null}
@@ -737,7 +799,7 @@ export default async function AirportPage(props: any) {
 
                   <div
                     style={{
-                      fontWeight: 900,
+                      fontWeight: 700,
                       color: "var(--foreground)",
                       whiteSpace: "nowrap",
                       flex: "0 0 auto",
@@ -755,7 +817,9 @@ export default async function AirportPage(props: any) {
         {/* Navaids */}
         <Card title="Navaids" subtitle="VOR/NDB/DME (dataset where available).">
           {navaids.length === 0 ? (
-            <p style={{ margin: 0, color: "var(--muted)" }}>No navaid records found for this airport.</p>
+            <p style={{ margin: 0, color: "var(--muted)", fontWeight: 500 }}>
+              No navaid records found for this airport.
+            </p>
           ) : (
             <div style={{ display: "grid", gap: 10, minWidth: 0 }}>
               {navaids.map((n: any) => {
@@ -764,7 +828,9 @@ export default async function AirportPage(props: any) {
                   Number.isFinite(Number(n.longitude_deg));
 
                 const maps = hasPos
-                  ? `https://www.google.com/maps?q=${Number(n.latitude_deg)},${Number(n.longitude_deg)}`
+                  ? `https://www.google.com/maps?q=${Number(n.latitude_deg)},${Number(
+                      n.longitude_deg
+                    )}`
                   : null;
 
                 return (
@@ -778,10 +844,10 @@ export default async function AirportPage(props: any) {
                       minWidth: 0,
                     }}
                   >
-                    <div style={{ fontWeight: 900, minWidth: 0, overflowWrap: "anywhere" }}>
+                    <div style={{ fontWeight: 700, minWidth: 0, overflowWrap: "anywhere" }}>
                       {n.ident ?? "—"} · {n.type ?? "—"}
                       {fmtNavaidFreq(n.frequency_khz) ? (
-                        <span style={{ color: "var(--muted)", fontWeight: 800 }}>
+                        <span style={{ color: "var(--muted)", fontWeight: 600 }}>
                           {" "}
                           · {fmtNavaidFreq(n.frequency_khz)}
                         </span>
@@ -792,18 +858,17 @@ export default async function AirportPage(props: any) {
                       style={{
                         color: "var(--muted)",
                         marginTop: 4,
-                        fontWeight: 700,
+                        fontWeight: 500,
                         minWidth: 0,
                         overflowWrap: "anywhere",
-                        wordBreak: "break-word",
                       }}
                     >
                       {n.name ?? "—"}
                     </div>
 
-                    <div style={{ color: "var(--muted)", marginTop: 4, fontWeight: 700, minWidth: 0 }}>
+                    <div style={{ color: "var(--muted)", marginTop: 4, fontWeight: 600, minWidth: 0 }}>
                       {maps ? (
-                        <a href={maps} target="_blank" style={{ ...linkStyle, fontWeight: 800 }}>
+                        <a href={maps} target="_blank" style={{ ...linkStyle, fontWeight: 600 }}>
                           {fmtCoord(n.latitude_deg)}, {fmtCoord(n.longitude_deg)}
                         </a>
                       ) : (
@@ -818,13 +883,15 @@ export default async function AirportPage(props: any) {
                         style={{
                           color: "var(--muted)",
                           marginTop: 6,
-                          fontWeight: 700,
+                          fontWeight: 500,
                           minWidth: 0,
                           overflowWrap: "anywhere",
                           wordBreak: "break-word",
                         }}
                       >
-                        <strong style={{ color: "var(--foreground)" }}>DME:</strong>{" "}
+                        <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>
+                          DME:
+                        </strong>{" "}
                         {n.dme_channel ? `CH ${n.dme_channel}` : ""}
                         {n.dme_channel && n.dme_frequency_khz ? " · " : ""}
                         {n.dme_frequency_khz ? `${Math.round(Number(n.dme_frequency_khz))} kHz` : ""}
@@ -837,7 +904,7 @@ export default async function AirportPage(props: any) {
           )}
         </Card>
 
-        <div style={{ padding: "10px 2px", color: "var(--muted)", fontSize: 14, minWidth: 0 }}>
+        <div style={{ padding: "10px 2px", color: "var(--muted)", fontSize: 14, minWidth: 0, fontWeight: 500 }}>
           Data: OurAirports (Public Domain). No guarantee of accuracy.
         </div>
       </div>
