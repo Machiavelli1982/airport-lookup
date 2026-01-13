@@ -1,12 +1,8 @@
-// web/app/sitemaps/airports/[n]/route.ts
 import { NextRequest } from "next/server";
 import { sql } from "@/lib/db";
 
 export const runtime = "nodejs";
-// optional: wenn du sicher dynamisch willst (z.B. bei DB-Latenz / Edge-Problemen):
-// export const dynamic = "force-dynamic";
 
-export const revalidate = 60 * 60 * 24; // 24h
 const CHUNK = 5000;
 
 function xmlEscape(s: string) {
@@ -27,11 +23,9 @@ export async function GET(
   const chunkIndex = Math.max(1, Number.parseInt(n, 10) || 1);
   const offset = (chunkIndex - 1) * CHUNK;
 
-  // Origin robust bestimmen
   const origin =
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? req.nextUrl.origin;
 
-  // Airport-Idents holen (stabil sortiert)
   const rows = await sql<{ ident: string }[]>`
     SELECT ident
     FROM airports
@@ -44,7 +38,6 @@ export async function GET(
     .map((r) => r.ident?.trim().toUpperCase())
     .filter(Boolean)
     .map((ident) => {
-      // Ziel-URL laut deinem Plan: /a/{ident}
       const loc = `${origin}/a/${encodeURIComponent(ident!)}`;
       return `  <url><loc>${xmlEscape(loc)}</loc></url>`;
     })
@@ -59,7 +52,6 @@ export async function GET(
   return new Response(body, {
     headers: {
       "content-type": "application/xml; charset=utf-8",
-      // optional: Vercel/CDN hint
       "cache-control": "public, s-maxage=86400, stale-while-revalidate=3600",
     },
   });

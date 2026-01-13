@@ -1,9 +1,8 @@
-// web/app/sitemap.xml/route.ts
 import { NextRequest } from "next/server";
 import { sql } from "@/lib/db";
 
 export const runtime = "nodejs";
-export const revalidate = 60 * 60 * 24; // 24h
+
 const CHUNK = 5000;
 
 function xmlEscape(s: string) {
