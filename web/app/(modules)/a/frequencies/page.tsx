@@ -1,90 +1,91 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 
+export const revalidate = 86400; // 24h
 
-export const revalidate = 86400;
-
-
-function norm(code: string) {
-  return code.trim().toUpperCase();
+function s(v: unknown): string {
+  return typeof v === "string" ? v : "";
 }
 
-export async function generateMetadata({ params }: { params: { code: string } }) {
-  const code = norm(params.code);
-
-  const rows = await sql/* sql */`
-    SELECT ident as icao, iata_code as iata, name
-    FROM airports
-    WHERE UPPER(ident)= ${code} OR UPPER(iata_code)= ${code}
-    LIMIT 1;
-  `;
-  const a = rows[0];
-  if (!a) return { title: "Frequencies – Airport not found" };
-
-  return {
-    title: `Frequencies – ${a.icao}${a.iata ? ` / ${a.iata}` : ""} – ${a.name}`,
-    description: `Radio frequencies for ${a.icao}${a.iata ? ` (${a.iata})` : ""} (where available). Reference only – not for real-world navigation.`,
-    robots: { index: true, follow: true },
-    alternates: { canonical: `/a/${a.icao}/frequencies` },
-  };
+function clean(v: unknown): string | null {
+  const t = s(v).trim();
+  return t.length ? t : null;
 }
 
-export default async function FrequenciesPage({ params }: { params: { code: string } }) {
-  const code = norm(params.code);
+export default async function FrequenciesIndex({
+  searchParams,
+}: {
+  searchParams?: Record<string, string | string[] | undefined>;
+}) {
+  // optional query, robust bei undefined/array
+  const qRaw = searchParams?.q;
+  const q = clean(Array.isArray(qRaw) ? qRaw[0] : qRaw);
 
-  const arows = await sql/* sql */`
-    SELECT id, ident as icao, iata_code as iata, name
-    FROM airports
-    WHERE UPPER(ident)= ${code} OR UPPER(iata_code)= ${code}
-    LIMIT 1;
-  `;
-  const a = arows[0];
-  if (!a) notFound();
-
-const freqs = await sql/* sql */`
-  SELECT type, description, frequency_mhz
-  FROM frequencies
-  WHERE airport_ref = ${a.id}
-  ORDER BY type, frequency_mhz;
-`;
-
+  // Wenn du ohne Query einfach eine kleine “Top” Liste zeigen willst:
+  // (oder leere Seite mit Hinweis)
+  const rows =
+    q
+      ? await sql/* sql */`
+          SELECT
+            airport_ident as icao,
+            type,
+            description,
+            frequency_mhz
+          FROM frequencies
+          WHERE airport_ident ILIKE ${q + "%"}
+             OR type ILIKE ${"%" + q + "%"}
+             OR description ILIKE ${"%" + q + "%"}
+          ORDER BY airport_ident, type
+          LIMIT 200;
+        `
+      : [];
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-6">
       <header className="mb-4">
-        <h1 className="text-xl font-semibold">
-          Frequencies – {a.icao}{a.iata ? ` / ${a.iata}` : ""} – {a.name}
-        </h1>
-        <p className="mt-2 text-xs text-muted-foreground">
+        <h1 className="text-xl font-semibold">Frequencies</h1>
+        <p className="text-sm text-muted-foreground">
           Reference only – not for real-world navigation.
         </p>
       </header>
 
-      <div className="grid gap-2">
-        {freqs.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No frequency data available.</p>
-        ) : (
-          freqs.map((f: any, idx: number) => (
-            <div key={idx} className="rounded-md border p-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="font-medium">{f.type}</div>
-                <div className="text-sm tabular-nums">
-                  {f.frequency_mhz != null ? `${Number(f.frequency_mhz).toFixed(3)} MHz` : "—"}
-                </div>
-              </div>
-              {f.description ? (
-                <div className="mt-1 text-sm text-muted-foreground">{f.description}</div>
-              ) : null}
-            </div>
-          ))
-        )}
-      </div>
+      {!q ? (
+        <p className="text-sm text-muted-foreground">
+          Add <span className="font-mono">?q=LOWW</span> to search.
+        </p>
+      ) : rows.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No results for “{q}”.</p>
+      ) : (
+        <ul className="grid gap-2">
+          {rows.map((r: any, idx: number) => {
+            const icao = clean(r.icao) ?? "";
+            const label = [
+              clean(r.type)?.toUpperCase(),
+              clean(r.description),
+              r.frequency_mhz != null ? `${r.frequency_mhz} MHz` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ");
 
-      <div className="mt-4 flex gap-3">
-        <Link className="text-sm underline" href={`/a/${a.icao}`}>Back to hub</Link>
-        <Link className="text-sm underline" href={`/airports/${a.icao}`}>Open full airport page</Link>
-      </div>
+            return (
+              <li key={idx} className="rounded-md border p-3">
+                <div className="flex items-baseline justify-between gap-3">
+                  <div className="font-medium">
+                    {icao ? (
+                      <Link className="underline" href={`/a/${icao}`}>
+                        {icao}
+                      </Link>
+                    ) : (
+                      "Unknown"
+                    )}
+                  </div>
+                </div>
+                <div className="mt-1 text-sm text-muted-foreground">{label}</div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </main>
   );
 }
