@@ -1,4 +1,3 @@
-// web/app/components/AirportSearch.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -54,7 +53,7 @@ export default function AirportSearch() {
 
   return (
     <div className="w-full max-w-xl">
-      <label className="block text-sm font-medium mb-2">
+      <label className="block text-sm font-medium mb-2 text-neutral-900 dark:text-neutral-100">
         Search airport (ICAO / IATA / city / name)
       </label>
 
@@ -67,42 +66,49 @@ export default function AirportSearch() {
         placeholder="Examples: LOWW, VIE, Vienna, Frankfurt…"
         inputMode="search"
         autoComplete="off"
-        className="w-full rounded-xl border px-4 py-3 text-base"
+        className="w-full rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-950 px-4 py-3 text-base text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-500"
       />
 
       <div className="mt-3">
-        {loading && <div className="text-sm opacity-70">Searching…</div>}
+        {loading && (
+          <div className="text-sm text-neutral-600 dark:text-neutral-300">
+            Searching…
+          </div>
+        )}
 
         {!loading && items.length > 0 && (
-          <div className="rounded-xl border divide-y overflow-hidden">
+          <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 divide-y divide-neutral-200 dark:divide-neutral-800 overflow-hidden bg-white dark:bg-neutral-900">
             {items.map((a) => (
               <Link
                 key={a.id}
                 href={`/airports/${encodeURIComponent(a.icao)}`}
-                className="block px-4 py-3 hover:bg-black/5"
+                className="block px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5"
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="font-semibold shrink-0">{a.icao}</span>
+                  <span className="font-semibold shrink-0 text-neutral-900 dark:text-neutral-100">
+                    {a.icao}
+                  </span>
 
                   {a.iata && (
-                    <span className="text-xs rounded-md border px-2 py-0.5 shrink-0">
+                    <span className="text-xs rounded-md border border-neutral-300 dark:border-neutral-700 px-2 py-0.5 shrink-0 text-neutral-800 dark:text-neutral-200">
                       {a.iata}
                     </span>
                   )}
 
-                  {/* type can get long; prevent horizontal overflow */}
                   {a.type && (
-                    <span className="text-sm opacity-80 truncate min-w-0">
+                    <span className="text-sm text-neutral-700 dark:text-neutral-300 truncate min-w-0">
                       {a.type}
                     </span>
                   )}
                 </div>
 
                 <div className="text-sm min-w-0">
-                  <span className="block truncate">{a.name}</span>
+                  <span className="block truncate text-neutral-900 dark:text-neutral-100">
+                    {a.name}
+                  </span>
 
                   {(a.municipality || a.iso_country) && (
-                    <span className="block opacity-70 truncate">
+                    <span className="block truncate text-neutral-600 dark:text-neutral-400">
                       {a.municipality ?? ""}
                       {a.municipality && a.iso_country ? " " : ""}
                       {a.iso_country ? `(${a.iso_country})` : ""}
@@ -115,11 +121,13 @@ export default function AirportSearch() {
         )}
 
         {!loading && touched && canSearch && items.length === 0 && (
-          <div className="text-sm opacity-70">No matches.</div>
+          <div className="text-sm text-neutral-600 dark:text-neutral-300">
+            No matches.
+          </div>
         )}
 
         {!loading && !canSearch && (
-          <div className="text-sm opacity-70">
+          <div className="text-sm text-neutral-600 dark:text-neutral-300">
             Type at least 2 characters to search.
           </div>
         )}

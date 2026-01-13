@@ -2,19 +2,25 @@
 
 /* Base tokens */
 :root {
-  /* Light: softer than pure white/black */
   --background: #fcfcfd;
-  --foreground: #111827; /* neutral-900-ish */
+  --foreground: #111827;
 
-  /* Let the browser pick correct default form controls in both modes */
+  /* extra tokens for readable UI */
+  --muted: rgba(17, 24, 39, 0.70);
+  --card: #ffffff;
+  --border: rgba(0, 0, 0, 0.12);
+
   color-scheme: light dark;
 }
 
-/* Dark mode: improve readability + reduce harsh contrast */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0b1220; /* deep navy instead of pure black */
-    --foreground: #e5e7eb; /* neutral-200-ish */
+    --background: #0b1220;
+    --foreground: #e5e7eb;
+
+    --muted: rgba(229, 231, 235, 0.72);
+    --card: rgba(255, 255, 255, 0.06);
+    --border: rgba(255, 255, 255, 0.14);
   }
 }
 
@@ -35,7 +41,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Optional helper for long tokens (use className="break-anywhere") */
+/* Optional helper for long tokens */
 .break-anywhere {
   overflow-wrap: anywhere;
   word-break: break-word;

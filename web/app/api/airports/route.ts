@@ -1,23 +1,12 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
-export const runtime = "nodejs"; // safe default for postgres-js
+export const runtime = "nodejs";
 
 function norm(q: string) {
   return q.trim().toUpperCase();
 }
 
-/**
- * GET /api/airports?q=loww
- * Ranking:
- * 0 ICAO exact
- * 1 IATA exact
- * 2 ICAO prefix
- * 3 IATA prefix
- * 4 municipality contains (city)
- * 5 name contains
- * 6 region/country contains (optional signal)
- */
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const qRaw = (searchParams.get("q") ?? "").trim();
@@ -40,7 +29,22 @@ export async function GET(req: Request) {
       iso_region,
       type,
       latitude_deg,
-      longitude_deg
+      longitude_deg,
+
+      -- ranking helpers
+      (iata_code IS NOT NULL) as has_iata,
+      (ident ~ '^[A-Z]{4}$') as is_icao4,
+      (ident LIKE '%-%') as has_dash_ident,
+      CASE
+        WHEN type = 'large_airport' THEN 0
+        WHEN type = 'medium_airport' THEN 1
+        WHEN type = 'small_airport' THEN 2
+        WHEN type = 'heliport' THEN 3
+        WHEN type = 'seaplane_base' THEN 4
+        WHEN type = 'balloonport' THEN 5
+        WHEN type = 'closed' THEN 9
+        ELSE 6
+      END as type_rank
     FROM airports
     WHERE
       ident = ${q}
@@ -52,6 +56,7 @@ export async function GET(req: Request) {
       OR iso_region ILIKE ${likeRaw}
       OR iso_country ILIKE ${likeRaw}
     ORDER BY
+      -- primary: exact/prefix code matches always first
       CASE
         WHEN ident = ${q} THEN 0
         WHEN iata_code = ${q} THEN 1
@@ -61,11 +66,22 @@ export async function GET(req: Request) {
         WHEN name ILIKE ${likeRaw} THEN 5
         ELSE 6
       END,
-      -- tie-breakers (stable, friendly)
+
+      -- secondary: prefer real airports over local ids for city/name searches
+      has_iata DESC,
+      is_icao4 DESC,
+      has_dash_ident ASC,
+
+      -- push closed down
+      type_rank ASC,
+
+      -- stable tie-breakers
       municipality NULLS LAST,
       name ASC
     LIMIT 12;
   `;
 
-  return NextResponse.json({ items });
+  return NextResponse.json({
+    items: items.map(({ has_iata, is_icao4, has_dash_ident, type_rank, ...rest }: any) => rest),
+  });
 }
