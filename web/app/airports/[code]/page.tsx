@@ -108,12 +108,15 @@ function Card(props: { title: string; subtitle?: string; children?: any }) {
 
 function KV(props: { k: string; v: any }) {
   return (
-    <div style={{ display: "flex", gap: 10, padding: "6px 0" }}>
-      <div style={{ width: 170, color: "var(--muted)" }}>{props.k}</div>
-      <div style={{ fontWeight: 600, color: "var(--foreground)" }}>
-        {props.v ?? "—"}
-      </div>
-    </div>
+<div style={{ display: "flex", gap: 10, padding: "6px 0", flexWrap: "wrap" }}>
+  <div style={{ width: 170, color: "var(--muted)", flex: "0 0 170px" }}>
+    {props.k}
+  </div>
+  <div style={{ fontWeight: 600, color: "var(--foreground)", minWidth: 0, flex: "1 1 260px" }}>
+    {props.v ?? "—"}
+  </div>
+</div>
+
   );
 }
 
@@ -306,19 +309,32 @@ export default async function AirportPage(props: any) {
                 background: "rgba(255,255,255,0.03)",
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                <div style={{ fontWeight: 800, color: "var(--muted)" }}>Runway Summary</div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {longest ? (
-                    <>
-                      <Badge text={isLighted(longest) ? "Lighted" : "Unlit"} tone={isLighted(longest) ? "ok" : "muted"} />
-                      {isClosed(longest) && <Badge text="Closed" tone="warn" />}
-                    </>
-                  ) : (
-                    <Badge text="No runways" tone="muted" />
-                  )}
-                </div>
-              </div>
+<div
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    gap: 12,
+    flexWrap: "wrap",
+  }}
+>
+  <div style={{ fontWeight: 800, color: "var(--muted)", flex: "1 1 160px" }}>
+    Runway Summary
+  </div>
+
+  <div
+    style={{
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      justifyContent: "flex-end",
+      flex: "0 0 auto",
+    }}
+  >
+    ...
+  </div>
+</div>
+
 
               <div style={{ marginTop: 6, fontSize: 20, fontWeight: 900 }}>
                 {longest ? (
@@ -399,17 +415,32 @@ export default async function AirportPage(props: any) {
               ) : (
                 <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
                   {associatedTop.map((n: any) => (
-                    <div key={n.id} style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                      <div style={{ minWidth: 0 }}>
-                        <span style={{ fontWeight: 900 }}>{n.ident ?? "—"}</span>{" "}
-                        <span style={{ color: "var(--muted)", fontWeight: 700 }}>
-                          · {n.type ?? "—"} · {n.name ?? "—"}
-                        </span>
-                      </div>
-                      <div style={{ fontWeight: 900, color: "var(--muted)" }}>
-                        {fmtNavaidFreq(n.frequency_khz) ?? "—"}
-                      </div>
-                    </div>
+                    <div
+  key={n.id}
+  style={{
+    display: "flex",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: 10,
+    flexWrap: "wrap",
+  }}
+>
+  <div style={{ minWidth: 0, flex: "1 1 220px" }}>
+    ...
+  </div>
+
+  <div
+    style={{
+      fontWeight: 900,
+      color: "var(--muted)",
+      whiteSpace: "nowrap",
+      flex: "0 0 auto",
+    }}
+  >
+    {fmtNavaidFreq(n.frequency_khz) ?? "—"}
+  </div>
+</div>
+
                   ))}
                 </div>
               )}
@@ -496,16 +527,32 @@ export default async function AirportPage(props: any) {
                       background: "rgba(255,255,255,0.03)",
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                      <div style={{ fontWeight: 900 }}>
-                        {r.le_ident ?? "—"} / {r.he_ident ?? "—"}
-                      </div>
+                    <div
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    gap: 12,
+    flexWrap: "wrap",
+  }}
+>
+  <div style={{ fontWeight: 900, minWidth: 0, flex: "1 1 140px" }}>
+    {r.le_ident ?? "—"} / {r.he_ident ?? "—"}
+  </div>
 
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        <Badge text={lighted ? "Lighted" : "Unlit"} tone={lighted ? "ok" : "muted"} />
-                        {closed && <Badge text="Closed" tone="warn" />}
-                      </div>
-                    </div>
+  <div
+    style={{
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      justifyContent: "flex-end",
+      flex: "0 0 auto",
+    }}
+  >
+    ...
+  </div>
+</div>
+
 
                     <div style={{ color: "var(--muted)", marginTop: 6, fontWeight: 700 }}>
                       {r.length_ft ? `${r.length_ft} ft / ${fmtMFromFt(r.length_ft)}` : "—"} · {r.surface ?? "—"} ·
@@ -529,29 +576,35 @@ export default async function AirportPage(props: any) {
             <div style={{ display: "grid", gap: 10 }}>
               {frequencies.map((f: any) => (
                 <div
-                  key={f.id}
-                  style={{
-                    border: "1px solid var(--border)",
-                    borderRadius: 14,
-                    padding: 12,
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: 12,
-                    background: "rgba(255,255,255,0.03)",
-                  }}
-                >
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 900 }}>
-                      {String(f.type ?? "—").toUpperCase()}
-                    </div>
-                    <div style={{ color: "var(--muted)", fontWeight: 700 }}>
-                      {f.description ?? "—"}
-                    </div>
-                  </div>
-                  <div style={{ fontWeight: 900, color: "var(--foreground)" }}>
-                    {fmtFreqMHz(f.frequency_mhz)}
-                  </div>
-                </div>
+  key={f.id}
+  style={{
+    border: "1px solid var(--border)",
+    borderRadius: 14,
+    padding: 12,
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    gap: 12,
+    flexWrap: "wrap",
+    background: "rgba(255,255,255,0.03)",
+  }}
+>
+  <div style={{ minWidth: 0, flex: "1 1 260px" }}>
+    ...
+  </div>
+
+  <div
+    style={{
+      fontWeight: 900,
+      color: "var(--foreground)",
+      whiteSpace: "nowrap",
+      flex: "0 0 auto",
+    }}
+  >
+    {fmtFreqMHz(f.frequency_mhz)}
+  </div>
+</div>
+
               ))}
             </div>
           )}
