@@ -2,12 +2,24 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
+import type { Metadata } from "next";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
+const FALLBACK_BASE = "https://www.airportlookup.com";
 
-/* ----------------------------- helpers ----------------------------- */
+function getBaseUrl() {
+  const raw =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ||
+    FALLBACK_BASE;
+
+  return raw
+    .replace(",", ".")
+    .replace(/^https?:\/\//, "https://")
+    .replace(/\/$/, "");
+}
 
 function norm(input: unknown) {
   return String(input ?? "").trim().toUpperCase();
@@ -19,6 +31,69 @@ function codeFromOriginalUri(originalUri: string | null) {
   const m = path.match(/^\/airports\/([^/]+)$/i);
   return m ? norm(decodeURIComponent(m[1])) : "";
 }
+
+export async function generateMetadata(props: any): Promise<Metadata> {
+  const base = getBaseUrl();
+
+  const p = await props?.params;
+  let code = norm(p?.code);
+
+  if (!code) {
+    const h = await headers();
+    code = codeFromOriginalUri(h.get("x-original-uri"));
+  }
+  if (!code) return {};
+
+  const airportRows = await sql/* sql */`
+    SELECT ident, iata_code, name, municipality, iso_country
+    FROM airports
+    WHERE ident = ${code} OR iata_code = ${code}
+    LIMIT 1
+  `;
+
+  const a = airportRows?.[0];
+  const ident = a?.ident ? norm(a.ident) : code;
+  const name = a?.name ? String(a.name) : "";
+  const city = a?.municipality ? String(a.municipality) : "";
+  const country = a?.iso_country ? String(a.iso_country) : "";
+
+  const placeBits = [city, country].filter(Boolean).join(", ");
+  const titleCore = name ? `${ident} – ${name}` : ident;
+
+  const title = `${titleCore} Frequencies & Runways | MSFS 2020 / 2024`;
+  const description = [
+    `Runway lengths, lighting status and ATC frequencies for ${titleCore}${
+      placeBits ? ` (${placeBits})` : ""
+    }.`,
+    `Reference for Microsoft Flight Simulator (MSFS 2020 & MSFS 2024).`,
+    `Not for real-world navigation.`,
+  ].join(" ");
+
+  const canonical = `${base}/airports/${ident}`;
+
+  return {
+    title,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      title,
+      description,
+      url: canonical,
+      siteName: "Airport Lookup",
+      type: "website",
+    },
+    twitter: {
+      card: "summary",
+      title,
+      description,
+    },
+  };
+}
+
+
+/* ----------------------------- helpers ----------------------------- */
+
+
 
 function isNonEmpty(s: any) {
   return typeof s === "string" && s.trim().length > 0;
