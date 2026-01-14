@@ -1,20 +1,22 @@
-import { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
-  const origin =
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? req.nextUrl.origin;
+export function GET() {
+  const txt = `User-agent: *
+Allow: /
 
-  const body =
-    `User-agent: *\n` +
-    `Allow: /\n` +
-    `Sitemap: ${origin}/sitemap.xml\n`;
+Disallow: /a/
+Disallow: /api/
 
-  return new Response(body, {
+Sitemap: https://www.airportlookup.com/sitemap.xml
+`;
+
+  return new NextResponse(txt, {
     headers: {
-      "content-type": "text/plain; charset=utf-8",
-      "cache-control": "public, s-maxage=86400, stale-while-revalidate=3600",
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "public, max-age=3600",
     },
   });
 }
