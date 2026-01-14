@@ -1,7 +1,43 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import AirportSearch from "@/app/components/AirportSearch";
 
 export const runtime = "nodejs";
+
+// IMPORTANT: set NEXT_PUBLIC_SITE_URL in Vercel (e.g. https://airportlookup.app)
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") || "http://localhost:3000";
+
+export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Airport Lookup for MSFS (Runways, Lights, Frequencies, Navaids)",
+    template: "%s · Airport Lookup",
+  },
+  description:
+    "Fast airport reference for Microsoft Flight Simulator (MSFS 2020/2024): runway data incl. lighting, tower/ground/ATIS frequencies, and navaids. Reference only — not for real-world navigation.",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    url: "/",
+    title: "Airport Lookup for MSFS (Runways, Lights, Frequencies, Navaids)",
+    description:
+      "Search airports by ICAO/IATA and view runway lighting, frequencies (TWR/GND/ATIS/APP), and navaids. Reference only.",
+    siteName: "Airport Lookup",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Airport Lookup for MSFS (Runways, Lights, Frequencies, Navaids)",
+    description:
+      "Search airports by ICAO/IATA and view runway lighting, frequencies, and navaids. Reference only.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
 
 const EXAMPLES = [
   { code: "LOWW", label: "Vienna (LOWW)" },
@@ -13,16 +49,40 @@ const EXAMPLES = [
 ];
 
 export default function Home() {
+  // Structured data: tell Google this is a searchable site
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "Airport Lookup",
+    url: SITE_URL,
+    potentialAction: {
+      "@type": "SearchAction",
+      target: `${SITE_URL}/airports/{search_term_string}`,
+      "query-input": "required name=search_term_string",
+    },
+  };
+
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-10">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
       {/* Hero */}
       <section className="mb-8">
         <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">
           Airport Lookup
         </h1>
+
         <p className="mt-2 text-sm text-neutral-700 dark:text-neutral-300">
-          Reference-only airport information for flight simulation: runways (incl.
-          lighting), frequencies, and navaids. Not for real-world navigation.
+          Fast reference-only airport info for flight simulation (MSFS 2020 / MSFS 2024):
+          runways (incl. lighting), frequencies, and navaids. Not for real-world navigation.
+        </p>
+
+        {/* Small, keyword-relevant helper line (doesn’t change UI much, but helps SEO) */}
+        <p className="mt-2 text-xs text-neutral-600 dark:text-neutral-400">
+          Popular searches: runway lights, runway length, ATIS/TWR/GND frequencies, VOR/NDB/DME.
         </p>
       </section>
 
@@ -89,6 +149,18 @@ export default function Home() {
           in the current open dataset. For ILS and operational procedures, always refer to
           official AIP charts.
         </p>
+      </section>
+
+      {/* Tiny internal link block (helps crawling; optional but recommended) */}
+      <section className="mt-8 text-xs text-neutral-600 dark:text-neutral-400">
+        <div className="font-medium text-neutral-700 dark:text-neutral-300">Quick links</div>
+        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-2">
+          {EXAMPLES.map((x) => (
+            <Link key={x.code} href={`/airports/${x.code}`} className="underline underline-offset-2">
+              {x.code} runway lights & frequencies
+            </Link>
+          ))}
+        </div>
       </section>
     </main>
   );
