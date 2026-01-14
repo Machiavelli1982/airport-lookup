@@ -5,6 +5,8 @@ import { sql } from "@/lib/db";
 import type { Metadata } from "next";
 
 export const runtime = "nodejs";
+export const revalidate = 60 * 60 * 24; // 24h
+
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 const FALLBACK_BASE = "https://www.airportlookup.com";

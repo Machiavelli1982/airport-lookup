@@ -91,6 +91,11 @@ export default function Home() {
       {/* Search */}
       <section className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 shadow-sm">
         <AirportSearch />
+<p className="mt-3 text-xs text-neutral-600 dark:text-neutral-400">
+  Airport Lookup is built for Microsoft Flight Simulator (MSFS 2020/2024) as a fast reference:
+  runway lighting, runway length & headings, and key frequencies like ATIS/TWR/GND/APP.
+  Search by ICAO or IATA and jump straight to a single canonical airport page.
+</p>
 
         {/* Examples */}
         <div className="mt-6">
