@@ -50,6 +50,15 @@ export default function RootLayout({
         `}
       >
         {children}
+        <footer className="mt-12 border-t border-neutral-200 dark:border-neutral-800 py-6 text-center text-xs text-neutral-600 dark:text-neutral-400">
+  <a
+    href="mailto:contact@airportlookup.com"
+    className="underline underline-offset-2 hover:text-neutral-900 dark:hover:text-neutral-200"
+  >
+    Contact
+  </a>
+</footer>
+
       </body>
     </html>
   );
