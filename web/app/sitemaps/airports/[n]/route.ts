@@ -1,4 +1,4 @@
-// app/sitemaps/airports/[n]/route.ts
+// web/app/sitemaps/airports/[n]/route.ts
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
@@ -9,9 +9,10 @@ const PAGE_SIZE = 5000;
 
 export async function GET(
   _req: Request,
-  { params }: { params: { n: string } }
+  context: { params: Promise<{ n: string }> }
 ) {
-  const page = Math.max(0, parseInt(params.n, 10) || 0);
+  const { n } = await context.params;
+  const page = Math.max(0, parseInt(n, 10) || 0);
   const offset = page * PAGE_SIZE;
 
   const rows = await sql/* sql */`
@@ -24,7 +25,7 @@ export async function GET(
     OFFSET ${offset}
   `;
 
-  const base = process.env.NEXT_PUBLIC_SITE_URL || "https://airport-lookup.xyz";
+  const base = process.env.NEXT_PUBLIC_SITE_URL || "https://www.airportlookup.com";
   const now = new Date().toISOString().split("T")[0];
 
   const urls = rows

@@ -16,7 +16,7 @@ export async function GET() {
   `;
 
   const pages = Math.ceil((count || 0) / PAGE_SIZE);
-  const base = process.env.NEXT_PUBLIC_SITE_URL || "https://airport-lookup.xyz";
+  const base = process.env.NEXT_PUBLIC_SITE_URL || "https://airportlookup,com";
 
   const now = new Date().toISOString().split("T")[0];
 
