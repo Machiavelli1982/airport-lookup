@@ -15,11 +15,17 @@ function getBaseUrl() {
     process.env.VERCEL_PROJECT_PRODUCTION_URL ||
     FALLBACK_BASE;
 
-  return raw
-    .replace(",", ".")
-    .replace(/^https?:\/\//, "https://")
-    .replace(/\/$/, "");
+  const cleaned = String(raw).trim().replace(",", ".").replace(/\/$/, "");
+
+  // if already has scheme, normalize to https
+  if (/^https?:\/\//i.test(cleaned)) {
+    return cleaned.replace(/^http:\/\//i, "https://");
+  }
+
+  // otherwise, add https://
+  return `https://${cleaned.replace(/^\/+/, "")}`;
 }
+
 
 function norm(input: unknown) {
   return String(input ?? "").trim().toUpperCase();
@@ -393,6 +399,22 @@ export default async function AirportPage(props: any) {
       : closedCount > 0
       ? { text: `CLOSED ${closedCount}`, tone: "warn" as const }
       : null;
+const base = getBaseUrl();
+const canonicalUrl = `${base}/airports/${airport.ident}`;
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Airport",
+  name: airport.name || airport.ident,
+  iataCode: airport.iata_code || undefined,
+  icaoCode: airport.ident || undefined,
+  geo: {
+    "@type": "GeoCoordinates",
+    latitude: Number(airport.latitude_deg),
+    longitude: Number(airport.longitude_deg),
+  },
+  url: canonicalUrl,
+};
 
   return (
     <main
@@ -403,7 +425,11 @@ export default async function AirportPage(props: any) {
         fontFamily: "system-ui",
         minWidth: 0,
       }}
-    >
+    ><script
+  type="application/ld+json"
+  dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+/>
+
       <div style={{ marginBottom: 12 }}>
         <Link
           href="/"
@@ -696,6 +722,110 @@ export default async function AirportPage(props: any) {
             </div>
           </div>
         </Card>
+{/* SEO Quick Guide (frozen exception, compact) */}
+<section
+  style={{
+    border: "1px solid var(--border)",
+    borderRadius: 18,
+    padding: 16,
+    background: "rgba(255,255,255,0.02)",
+    minWidth: 0,
+    maxWidth: "100%",
+  }}
+>
+  <h2
+    style={{
+      fontSize: 18,
+      margin: 0,
+      color: "var(--foreground)",
+      fontWeight: 800,
+      letterSpacing: -0.2,
+    }}
+  >
+    {airport.ident} in MSFS 2020 / 2024: frequencies, runways, lights
+  </h2>
+
+  <p style={{ margin: "8px 0 0", color: "var(--muted)", fontWeight: 500, lineHeight: 1.45 }}>
+    {airport.name ? (
+      <>
+        <strong style={{ color: "var(--foreground)" }}>{airport.name}</strong>{" "}
+        {airport.municipality ? <>in {airport.municipality}</> : null}
+        {airport.iso_country ? <> ({airport.iso_country})</> : null}
+        {" "}— sim reference for quick ATC & runway planning.
+      </>
+    ) : (
+      <>Sim reference for quick ATC & runway planning.</>
+    )}
+  </p>
+
+  <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
+    {/* Runway sentence */}
+    <p style={{ margin: 0, color: "var(--muted)", fontWeight: 500, lineHeight: 1.45 }}>
+      <strong style={{ color: "var(--foreground)" }}>Runways:</strong>{" "}
+      {totalRunways > 0 ? (
+        <>
+          {totalRunways} listed.{" "}
+          {runways.length > 0 ? (
+            <>
+              Longest is{" "}
+              <strong style={{ color: "var(--foreground)" }}>
+                {runways[0]?.le_ident ?? "—"}/{runways[0]?.he_ident ?? "—"}
+              </strong>{" "}
+              at{" "}
+              <strong style={{ color: "var(--foreground)" }}>
+                {runways[0]?.length_ft ? `${runways[0].length_ft} ft` : "—"}
+              </strong>
+              {" "}({runways[0]?.length_ft ? fmtMFromFt(runways[0].length_ft) : "—"}).
+            </>
+          ) : null}{" "}
+          Lighting:{" "}
+          <strong style={{ color: "var(--foreground)" }}>
+            {lightedCount}/{totalRunways} lighted
+          </strong>
+          {" "} (dataset).
+        </>
+      ) : (
+        <>No runway data available in dataset.</>
+      )}
+    </p>
+
+    {/* Primary frequency sentence */}
+    <p style={{ margin: 0, color: "var(--muted)", fontWeight: 500, lineHeight: 1.45 }}>
+      <strong style={{ color: "var(--foreground)" }}>Primary frequency:</strong>{" "}
+      {primaryFreq ? (
+        <>
+          <strong style={{ color: "var(--foreground)" }}>
+            {String(primaryFreq.type ?? "").toUpperCase()} {fmtFreqMHz(primaryFreq.frequency_mhz)}
+          </strong>
+          {primaryFreq.description ? <> ({primaryFreq.description})</> : null}.
+        </>
+      ) : (
+        <>No comm frequency in dataset.</>
+      )}
+      {" "}Use for MSFS planning only — not for real-world navigation.
+    </p>
+
+    {/* Optional navaid line */}
+    <p style={{ margin: 0, color: "var(--muted)", fontWeight: 500, lineHeight: 1.45 }}>
+      <strong style={{ color: "var(--foreground)" }}>Navaids:</strong>{" "}
+      {navaids.length > 0 ? (
+        <>
+          {Math.min(navaids.length, 5)} shown below (VOR/NDB/DME where available). If an ILS/LOC is missing,
+          the dataset may not include it for this airport.
+        </>
+      ) : (
+        <>No navaids listed for this airport in dataset.</>
+      )}
+    </p>
+  </div>
+
+  {/* Mini keyword footer (helps indexing, looks neutral) */}
+  <div style={{ marginTop: 10, color: "var(--muted)", fontSize: 13, fontWeight: 500 }}>
+    Keywords: {airport.ident}
+    {airport.iata_code ? ` ${airport.iata_code}` : ""} runway lights, tower frequency, ground, atis, approach,
+    MSFS 2020, MSFS 2024.
+  </div>
+</section>
 
         {/* Airport Info */}
         <Card title="Airport Info" subtitle="Name, codes, location, coordinates, elevation.">
