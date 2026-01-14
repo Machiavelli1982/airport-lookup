@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import AirportSearch from "@/app/components/AirportSearch";
+import NearbyAirports from "@/app/components/NearbyAirports";
+
 
 export const runtime = "nodejs";
 
@@ -110,6 +112,8 @@ export default function Home() {
       </section>
 
       {/* Feature Cards */}
+      <NearbyAirports />
+
       <section className="mt-8 grid gap-4 md:grid-cols-3">
         <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 shadow-sm">
           <div className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
