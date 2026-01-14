@@ -5,7 +5,8 @@ import { sql } from "@/lib/db";
 import type { Metadata } from "next";
 
 export const runtime = "nodejs";
-export const revalidate = 60 * 60 * 24; // 24h
+export const revalidate = 86400; // 24h
+
 
 
 export const fetchCache = "force-no-store";
