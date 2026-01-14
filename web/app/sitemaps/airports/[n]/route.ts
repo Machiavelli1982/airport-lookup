@@ -1,58 +1,50 @@
-import { NextRequest } from "next/server";
+// app/sitemaps/airports/[n]/route.ts
+import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-const CHUNK = 5000;
-
-function xmlEscape(s: string) {
-  return s
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
-}
+const PAGE_SIZE = 5000;
 
 export async function GET(
-  req: NextRequest,
-  context: { params: Promise<{ n: string }> }
+  _req: Request,
+  { params }: { params: { n: string } }
 ) {
-  const { n } = await context.params;
+  const page = Math.max(0, parseInt(params.n, 10) || 0);
+  const offset = page * PAGE_SIZE;
 
-  const chunkIndex = Math.max(1, Number.parseInt(n, 10) || 1);
-  const offset = (chunkIndex - 1) * CHUNK;
-
-  const origin =
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? req.nextUrl.origin;
-
-  const rows = await sql<{ ident: string }[]>`
+  const rows = await sql/* sql */`
     SELECT ident
     FROM airports
-    WHERE ident IS NOT NULL AND ident <> ''
+    WHERE type IN ('large_airport', 'medium_airport')
+      AND ident IS NOT NULL
     ORDER BY ident ASC
-    LIMIT ${CHUNK} OFFSET ${offset};
+    LIMIT ${PAGE_SIZE}
+    OFFSET ${offset}
   `;
 
+  const base = process.env.NEXT_PUBLIC_SITE_URL || "https://airport-lookup.xyz";
+  const now = new Date().toISOString().split("T")[0];
+
   const urls = rows
-    .map((r) => r.ident?.trim().toUpperCase())
-    .filter(Boolean)
-    .map((ident) => {
-      const loc = `${origin}/a/${encodeURIComponent(ident!)}`;
-      return `  <url><loc>${xmlEscape(loc)}</loc></url>`;
-    })
-    .join("\n");
+    .map(
+      (r: any) => `
+  <url>
+    <loc>${base}/airports/${r.ident}</loc>
+    <lastmod>${now}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>`
+    )
+    .join("");
 
-  const body =
-    `<?xml version="1.0" encoding="UTF-8"?>\n` +
-    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
-    `${urls}\n` +
-    `</urlset>\n`;
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls}
+</urlset>`;
 
-  return new Response(body, {
-    headers: {
-      "content-type": "application/xml; charset=utf-8",
-      "cache-control": "public, s-maxage=86400, stale-while-revalidate=3600",
-    },
+  return new NextResponse(xml, {
+    headers: { "Content-Type": "application/xml; charset=utf-8" },
   });
 }

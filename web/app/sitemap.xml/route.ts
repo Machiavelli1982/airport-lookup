@@ -1,49 +1,38 @@
-import { NextRequest } from "next/server";
+// app/sitemap.xml/route.ts
+import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-const CHUNK = 5000;
+const PAGE_SIZE = 5000; // sicher unter Google-Limit (50k)
 
-function xmlEscape(s: string) {
-  return s
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
-}
-
-export async function GET(req: NextRequest) {
-  const origin =
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? req.nextUrl.origin;
-
-  const [{ cnt }] = await sql<{ cnt: number }[]>`
-    SELECT COUNT(*)::int AS cnt
+export async function GET() {
+  const [{ count }] = await sql/* sql */`
+    SELECT COUNT(*)::int AS count
     FROM airports
-    WHERE ident IS NOT NULL AND ident <> '';
+    WHERE type IN ('large_airport', 'medium_airport')
+      AND ident IS NOT NULL
   `;
 
-  const total = Number(cnt) || 0;
-  const chunks = Math.max(1, Math.ceil(total / CHUNK));
+  const pages = Math.ceil((count || 0) / PAGE_SIZE);
+  const base = process.env.NEXT_PUBLIC_SITE_URL || "https://airport-lookup.xyz";
 
-  const sitemaps = Array.from({ length: chunks }, (_, i) => i + 1)
-    .map((i) => {
-      const loc = `${origin}/sitemaps/airports/${i}`;
-      return `  <sitemap><loc>${xmlEscape(loc)}</loc></sitemap>`;
-    })
-    .join("\n");
+  const now = new Date().toISOString().split("T")[0];
 
-  const body =
-    `<?xml version="1.0" encoding="UTF-8"?>\n` +
-    `<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
-    `${sitemaps}\n` +
-    `</sitemapindex>\n`;
+  const urls = Array.from({ length: pages }, (_, i) => `
+    <sitemap>
+      <loc>${base}/sitemaps/airports/${i}.xml</loc>
+      <lastmod>${now}</lastmod>
+    </sitemap>
+  `).join("");
 
-  return new Response(body, {
-    headers: {
-      "content-type": "application/xml; charset=utf-8",
-      "cache-control": "public, s-maxage=86400, stale-while-revalidate=3600",
-    },
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls}
+</sitemapindex>`;
+
+  return new NextResponse(xml, {
+    headers: { "Content-Type": "application/xml; charset=utf-8" },
   });
 }
