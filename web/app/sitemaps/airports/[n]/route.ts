@@ -6,6 +6,19 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 5000;
+const FALLBACK_BASE = "https://www.airportlookup.com";
+
+function getBaseUrl() {
+  const raw =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ||
+    FALLBACK_BASE;
+
+  return raw
+    .replace(",", ".")
+    .replace(/^https?:\/\//, "https://")
+    .replace(/\/$/, "");
+}
 
 export async function GET(
   _req: Request,
@@ -25,7 +38,7 @@ export async function GET(
     OFFSET ${offset}
   `;
 
-  const base = process.env.NEXT_PUBLIC_SITE_URL || "https://www.airportlookup.com";
+  const base = getBaseUrl();
   const now = new Date().toISOString().split("T")[0];
 
   const urls = rows

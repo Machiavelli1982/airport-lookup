@@ -1,11 +1,24 @@
-// app/sitemap.xml/route.ts
+// web/app/sitemap.xml/route.ts
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const PAGE_SIZE = 5000; // sicher unter Google-Limit (50k)
+const PAGE_SIZE = 5000;
+const FALLBACK_BASE = "https://www.airportlookup.com";
+
+function getBaseUrl() {
+  const raw =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ||
+    FALLBACK_BASE;
+
+  return raw
+    .replace(",", ".")
+    .replace(/^https?:\/\//, "https://")
+    .replace(/\/$/, "");
+}
 
 export async function GET() {
   const [{ count }] = await sql/* sql */`
@@ -16,8 +29,7 @@ export async function GET() {
   `;
 
   const pages = Math.ceil((count || 0) / PAGE_SIZE);
-  const base = process.env.NEXT_PUBLIC_SITE_URL || "https://airportlookup,com";
-
+  const base = getBaseUrl();
   const now = new Date().toISOString().split("T")[0];
 
   const urls = Array.from({ length: pages }, (_, i) => `
