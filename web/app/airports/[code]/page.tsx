@@ -147,6 +147,58 @@ function fmtNavaidFreq(freq_khz: any) {
   return `${Math.round(x)} kHz`;
 }
 
+
+async function lookupCountryName(isoCountry: any) {
+  const code = norm(isoCountry);
+  if (!code) return null;
+
+  const rows = await sql/* sql */`
+    SELECT name
+    FROM countries
+    WHERE code = ${code}
+    LIMIT 1
+  `;
+  return rows?.[0]?.name ? String(rows[0].name) : null;
+}
+
+
+async function lookupRegionName(isoRegion: any) {
+  const code = norm(isoRegion);
+  if (!code) return null;
+
+  const rows = await sql/* sql */`
+    SELECT name
+    FROM regions
+    WHERE code = ${code}
+    LIMIT 1
+  `;
+  return rows?.[0]?.name ? String(rows[0].name) : null;
+}
+
+
+function surfaceLabel(surface: any) {
+  const s = String(surface ?? "").trim().toUpperCase();
+  if (!s) return "—";
+
+  const map: Record<string, string> = {
+    ASP: "Asphalt",
+    CON: "Concrete",
+    BIT: "Bitumen",
+    GRE: "Grass",
+    GRS: "Grass",
+    TURF: "Turf",
+    GRV: "Gravel",
+    DRT: "Dirt",
+    SND: "Sand",
+    WTR: "Water",
+    ICE: "Ice",
+    SNW: "Snow",
+    UNK: "Unknown",
+  };
+
+  return map[s] ?? surface; // fallback: original value
+}
+
 function pickPrimaryFrequency(frequencies: any[]) {
   if (!frequencies?.length) return null;
 
@@ -324,6 +376,14 @@ export default async function AirportPage(props: any) {
   `;
   const airport = airportRows?.[0];
   if (!airport) notFound();
+const countryName = airport.iso_country
+  ? await lookupCountryName(airport.iso_country)
+  : null;
+
+const regionName = airport.iso_region
+  ? await lookupRegionName(airport.iso_region)
+  : null;
+
 
   const runways = await sql/* sql */`
     SELECT
@@ -562,7 +622,8 @@ const jsonLd = {
                 {r.length_ft
                   ? `${r.length_ft} ft / ${fmtMFromFt(r.length_ft)}`
                   : "—"}{" "}
-                · {r.surface ?? "—"}
+· {surfaceLabel(r.surface)}
+
               </span>
             </div>
 
@@ -836,8 +897,25 @@ const jsonLd = {
           <KV k="Codes" v={`${airport.iata_code ?? "—"} / ${airport.ident}`} />
           <KV k="Type" v={airport.type ?? "—"} />
           <KV k="City" v={airport.municipality ?? "—"} />
-          <KV k="Country" v={airport.iso_country ?? "—"} />
-          <KV k="Region" v={airport.iso_region ?? "—"} />
+<KV
+  k="Country"
+  v={
+    airport.iso_country
+      ? `${airport.iso_country}${countryName ? ` — ${countryName}` : ""}`
+      : "—"
+  }
+/>
+
+<KV
+  k="Region"
+  v={
+    airport.iso_region
+      ? `${airport.iso_region}${regionName ? ` — ${regionName}` : ""}`
+      : "—"
+  }
+/>
+
+
           <KV k="Continent" v={airport.continent ?? "—"} />
 
           <KV
@@ -993,8 +1071,14 @@ const jsonLd = {
                         wordBreak: "break-word",
                       }}
                     >
-                      {r.length_ft ? `${r.length_ft} ft / ${fmtMFromFt(r.length_ft)}` : "—"} ·{" "}
-                      {r.surface ?? "—"} · HDG {r.le_heading_degt ?? "—"}° /{" "}
+{r.length_ft ? `${r.length_ft} ft / ${fmtMFromFt(r.length_ft)}` : "—"}
+{" · "}
+{r.width_ft ? `${r.width_ft} ft / ${fmtMFromFt(r.width_ft)} wide` : "— wide"}
+{" · "}
+{surfaceLabel(r.surface)}
+{" · "}
+HDG {r.le_heading_degt ?? "—"}° / {r.he_heading_degt ?? "—"}°
+
                       {r.he_heading_degt ?? "—"}°
                     </div>
                   </div>
