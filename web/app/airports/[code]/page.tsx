@@ -1079,7 +1079,7 @@ const jsonLd = {
 {" · "}
 HDG {r.le_heading_degt ?? "—"}° / {r.he_heading_degt ?? "—"}°
 
-                      {r.he_heading_degt ?? "—"}°
+
                     </div>
                   </div>
                 );
