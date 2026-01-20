@@ -1071,7 +1071,7 @@ const jsonLd = {
                         wordBreak: "break-word",
                       }}
                     >
-{r.length_ft ? `${r.length_ft} ft / ${fmtMFromFt(r.length_ft)}` : "—"}
+{r.length_ft ? `${r.length_ft} ft / ${fmtMFromFt(r.length_ft)} long` : "— long"}
 {" · "}
 {r.width_ft ? `${r.width_ft} ft / ${fmtMFromFt(r.width_ft)} wide` : "— wide"}
 {" · "}
