@@ -74,18 +74,11 @@ export async function generateMetadata({
     };
   }
 
-  const airportName = airport.name;
-  const city = airport.municipality;
-  const iso = airport.iso_country;
+  const airportName = String(airport.name ?? ident);
+  const city = airport.municipality ? String(airport.municipality) : "";
+  const iso = airport.iso_country ? String(airport.iso_country) : "";
 
-  // optional: Langname holen (wenn du willst)
-  let countryName: string | null = null;
-  if (iso) {
-    const c = await sql/* sql */`
-      SELECT name FROM countries WHERE code = ${String(iso)} LIMIT 1
-    `;
-    countryName = c?.[0]?.name ? String(c[0].name) : null;
-  }
+  const countryName = iso ? await lookupCountryName(iso) : null;
 
   const placeBits = [city, countryName || iso].filter(Boolean).join(", ");
 
@@ -114,6 +107,7 @@ export async function generateMetadata({
     twitter: { card: "summary", title, description },
   };
 }
+
 
 
 
