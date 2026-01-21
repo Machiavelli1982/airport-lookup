@@ -5,11 +5,12 @@ import { sql } from "@/lib/db";
 import type { Metadata } from "next";
 
 export const runtime = "nodejs";
+
 export const revalidate = 86400; // 24h
 
 
 
-export const fetchCache = "force-no-store";
+
 const FALLBACK_BASE = "https://www.airportlookup.com";
 
 function getBaseUrl() {
@@ -41,63 +42,81 @@ function codeFromOriginalUri(originalUri: string | null) {
   return m ? norm(decodeURIComponent(m[1])) : "";
 }
 
-export async function generateMetadata(props: any): Promise<Metadata> {
-  const base = getBaseUrl();
 
-  const p = await props?.params;
-  let code = norm(p?.code);
 
-  if (!code) {
-    const h = await headers();
-    code = codeFromOriginalUri(h.get("x-original-uri"));
-  }
-  if (!code) return {};
 
-  const airportRows = await sql/* sql */`
-    SELECT ident, iata_code, name, municipality, iso_country
+
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { code: string };
+}): Promise<Metadata> {
+  const ident = params.code.trim().toUpperCase();
+
+  const rows = await sql/* sql */`
+    SELECT
+      ident,
+      name,
+      municipality,
+      iso_country
     FROM airports
-    WHERE ident = ${code} OR iata_code = ${code}
+    WHERE ident = ${ident}
     LIMIT 1
   `;
 
-  const a = airportRows?.[0];
-  const ident = a?.ident ? norm(a.ident) : code;
-  const name = a?.name ? String(a.name) : "";
-  const city = a?.municipality ? String(a.municipality) : "";
-  const country = a?.iso_country ? String(a.iso_country) : "";
+  const airport = rows?.[0];
 
-  const placeBits = [city, country].filter(Boolean).join(", ");
-  const titleCore = name ? `${ident} – ${name}` : ident;
+  if (!airport) {
+    return {
+      title: `${ident} Airport | MSFS`,
+      robots: { index: false, follow: false },
+    };
+  }
 
-  const title = `${titleCore} Frequencies & Runways | MSFS 2020 / 2024`;
+  const airportName = airport.name;
+  const city = airport.municipality;
+  const iso = airport.iso_country;
+
+  // optional: Langname holen (wenn du willst)
+  let countryName: string | null = null;
+  if (iso) {
+    const c = await sql/* sql */`
+      SELECT name FROM countries WHERE code = ${String(iso)} LIMIT 1
+    `;
+    countryName = c?.[0]?.name ? String(c[0].name) : null;
+  }
+
+  const placeBits = [city, countryName || iso].filter(Boolean).join(", ");
+
+  const title = `${ident} – ${airportName} | Frequencies, Runways & Lights (MSFS)`;
+
   const description = [
-    `Runway lengths, lighting status and ATC frequencies for ${titleCore}${
-      placeBits ? ` (${placeBits})` : ""
-    }.`,
-    `Reference for Microsoft Flight Simulator (MSFS 2020 & MSFS 2024).`,
-    `Not for real-world navigation.`,
+    `Runway lengths, runway lights and ATC frequencies for ${airportName} (${ident}${
+      placeBits ? `, ${placeBits}` : ""
+    }) in Microsoft Flight Simulator.`,
+    `Fast reference — no addons. Not for real-world navigation.`,
   ].join(" ");
 
-  const canonical = `${base}/airports/${ident}`;
+  const canonicalUrl = `${getBaseUrl()}/airports/${ident}`;
 
   return {
     title,
     description,
-    alternates: { canonical },
+    alternates: { canonical: canonicalUrl },
     openGraph: {
       title,
       description,
-      url: canonical,
+      url: canonicalUrl,
       siteName: "Airport Lookup",
       type: "website",
     },
-    twitter: {
-      card: "summary",
-      title,
-      description,
-    },
+    twitter: { card: "summary", title, description },
   };
 }
+
+
+
 
 
 /* ----------------------------- helpers ----------------------------- */
