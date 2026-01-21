@@ -22,13 +22,13 @@ export default function NearbyAirports() {
   const getIcon = (type: string) => {
     switch (type) {
       case "large_airport": 
-        return <Plane className="w-5 h-5 text-blue-600 dark:text-blue-400" title="Large Airport" />;
+        return <Plane className="w-5 h-5 text-blue-600 dark:text-blue-400" />;
       case "medium_airport": 
-        return <Plane className="w-4 h-4 text-emerald-600 dark:text-emerald-400" title="Medium Airport" />;
+        return <Plane className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />;
       case "small_airport": 
-        return <Navigation className="w-4 h-4 text-amber-600 dark:text-amber-400" title="Small Airport" />;
+        return <Navigation className="w-4 h-4 text-amber-600 dark:text-amber-400" />;
       case "heliport": 
-        return <Wind className="w-4 h-4 text-purple-600 dark:text-purple-400" title="Heliport" />;
+        return <Wind className="w-4 h-4 text-purple-600 dark:text-purple-400" />;
       default: 
         return <Home className="w-4 h-4 text-neutral-500" />;
     }
