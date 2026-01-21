@@ -19,7 +19,7 @@ const SITE_URL =
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Airport Lookup",
+    default: "Airport Lookup [DEPLOY MARK 210126]",
     template: "%s | Airport Lookup",
   },
   description:
