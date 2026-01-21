@@ -1,3 +1,4 @@
+// web/app/page.tsx
 import type { Metadata } from "next";
 import Link from "next/link";
 import AirportSearch from "@/app/components/AirportSearch";
@@ -5,7 +6,6 @@ import NearbyAirports from "@/app/components/NearbyAirports";
 
 export const runtime = "nodejs";
 
-// Base URL für Canonical und OpenGraph
 const SITE_URL = "https://www.airportlookup.com";
 
 export const metadata: Metadata = {
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   },
 };
 
-// Internationale Beispiele für globalen SEO-Flow
+// Strategisch wichtige Hubs für SEO
 const EXAMPLES = [
   { code: "KJFK", label: "New York (KJFK)" },
   { code: "EGLL", label: "London (EGLL)" },
@@ -46,10 +46,11 @@ const EXAMPLES = [
   { code: "OMDB", label: "Dubai (OMDB)" },
   { code: "RJTT", label: "Tokyo (RJTT)" },
   { code: "LOWW", label: "Vienna (LOWW)" },
+  { code: "KLAX", label: "Los Angeles (KLAX)" },
+  { code: "LSZH", label: "Zürich (LSZH)" },
 ];
 
 export default function Home() {
-  // Structured data: Google Sitelinks Searchbox
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "WebSite",
@@ -72,11 +73,12 @@ export default function Home() {
       {/* Hero Section */}
       <section className="mb-8">
         <h1 className="text-4xl font-extrabold tracking-tight text-neutral-900 dark:text-neutral-100">
-          Airport Lookup
+          MSFS Airport Lookup
         </h1>
         <p className="mt-3 text-lg text-neutral-700 dark:text-neutral-300">
-          Fast reference-only airport info for <strong>Microsoft Flight Simulator (MSFS 2020 / 2024)</strong>. 
-          Runway lighting, frequencies, and navaids. Not for real-world navigation.
+          The essential <strong>flight simulator reference</strong> for pilots. Get instant access to 
+          runway data, lighting systems, and radio frequencies for over 5,000 airports worldwide. 
+          Optimized for <strong>MSFS 2020 & 2024</strong>.
         </p>
 
         <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
@@ -97,7 +99,7 @@ export default function Home() {
         {/* Global Examples */}
         <div className="mt-8">
           <div className="mb-3 text-xs font-bold uppercase tracking-widest text-neutral-500">
-            Global Hubs
+            Global Hubs & Popular Searches
           </div>
           <div className="flex flex-wrap gap-2">
             {EXAMPLES.map((x) => (
@@ -115,6 +117,18 @@ export default function Home() {
 
       {/* Dynamic Nearby Feature (UX & Engagement) */}
       <NearbyAirports />
+
+      {/* SEO Text Block - NEU für Google Ranking */}
+      <section className="mt-16 border-l-4 border-blue-500 pl-6 py-2">
+          <h2 className="text-2xl font-bold mb-4">Everything for your MSFS Flight Plan</h2>
+          <p className="text-neutral-600 dark:text-neutral-400 leading-relaxed max-w-3xl">
+            Whether you are flying a heavy jet into <strong>London Heathrow (EGLL)</strong> or a small bush plane 
+            into a remote <strong>small airfield</strong>, our database provides the critical info you need for a 
+            successful landing. We focus on <strong>runway lighting</strong>, approach frequencies, and 
+            Navaids (VOR/NDB) to help you navigate the virtual skies without opening complex charts. 
+            Perfect for <strong>Xbox simmers</strong> who need fast data on a second screen.
+          </p>
+      </section>
 
       {/* Feature Value Props */}
       <section className="mt-12 grid gap-6 md:grid-cols-3">
@@ -147,17 +161,17 @@ export default function Home() {
         </h3>
         <p className="mt-2 text-sm text-neutral-700 dark:text-neutral-300">
           ILS data is excluded to maintain reliability. For official flight procedures and real-world 
-          navigation, always use current AIP charts.
+          navigation, always use current AIP charts. Data is sourced from public domain datasets like OurAirports.
         </p>
       </section>
 
       {/* SEO Internal Link Footer */}
       <section className="mt-12 pt-8 border-t border-neutral-200 dark:border-neutral-800">
-        <div className="text-xs font-bold text-neutral-500 uppercase mb-4">Quick Airport Links</div>
+        <div className="text-xs font-bold text-neutral-500 uppercase mb-4">Quick Airport Links (MSFS Frequencies)</div>
         <div className="flex flex-wrap gap-x-6 gap-y-3 text-xs">
           {EXAMPLES.map((x) => (
             <Link key={x.code} href={`/airports/${x.code}`} className="text-neutral-600 dark:text-neutral-400 hover:text-blue-600 underline underline-offset-4">
-              {x.code} Frequencies & Runways
+              {x.code} Runway Lights & Comms
             </Link>
           ))}
         </div>
