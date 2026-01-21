@@ -54,42 +54,58 @@ function norm(code: string) {
 }
 
 const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") || "https://www.airportlookup.com";
+  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ||
+  "https://www.airportlookup.com";
 
 export async function generateMetadata(
   { params }: { params: { code: string } }
 ): Promise<Metadata> {
-  const code = norm(params?.code);
+  try {
+    const code = norm(params?.code);
+    if (!code) return { robots: { index: false, follow: false } };
 
-  // Ungültige Requests (leer / nonsense) dürfen noindex sein
-  if (!code) return { robots: { index: false, follow: false } };
+    const rows = await sql/* sql */`
+      SELECT ident as icao, iata_code as iata, name
+      FROM airports
+      WHERE ident = ${code} OR iata_code = ${code}
+      LIMIT 1
+    `;
 
-  // Fallback-Metadata: IMMER indexierbar + korrekter canonical
-  const fallback: Metadata = {
-    metadataBase: new URL(SITE_URL),
-    title: `${code} | Airport Lookup`,
-    description:
-      `MSFS reference for ${code}: runways (incl. lighting), ATIS/TWR/GND/APP frequencies, and navaids. ` +
-      `Reference only — not for real-world navigation.`,
-    alternates: { canonical: `/airports/${code}` },
-    robots: { index: true, follow: true },
-    openGraph: {
-      type: "article",
-      url: `/airports/${code}`,
-      title: `${code} | Airport Lookup`,
-      description:
-        `MSFS reference for ${code}: runways (incl. lighting), ATIS/TWR/GND/APP frequencies, and navaids. ` +
-        `Reference only — not for real-world navigation.`,
-      siteName: "Airport Lookup",
-    },
-    twitter: {
-      card: "summary",
-      title: `${code} | Airport Lookup`,
-      description:
-        `MSFS reference for ${code}: runways (incl. lighting), ATIS/TWR/GND/APP frequencies, and navaids. ` +
-        `Reference only — not for real-world navigation.`,
-    },
-  };
+    const a = rows?.[0];
+    if (!a?.icao || !a?.name) return { robots: { index: false, follow: false } };
+
+    const codes = `${a.icao}${a.iata ? ` / ${a.iata}` : ""}`;
+
+    // CTR-first Title: Codes + Name + 1-line value proposition
+    const title = `${codes} — ${a.name} (Runways, Frequencies, Lights)`;
+
+    // Description: konkret + MSFS intent, ohne Disclaimer
+    const desc =
+      `${a.icao}${a.iata ? ` (${a.iata})` : ""} ${a.name}: ` +
+      `runway lengths & lights, ATIS/TWR/GND/APP frequencies, and navaids for MSFS 2020/2024. ` +
+      `Fast, mobile-first lookup.`;
+
+    return {
+      metadataBase: new URL(SITE_URL),
+      title,
+      description: desc,
+      alternates: { canonical: `/airports/${a.icao}` },
+      robots: { index: true, follow: true },
+      openGraph: {
+        type: "article",
+        url: `/airports/${a.icao}`,
+        title,
+        description: desc,
+        siteName: "Airport Lookup",
+      },
+      twitter: { card: "summary", title, description: desc },
+    };
+  } catch (e) {
+    console.error("generateMetadata failed:", e);
+    return { robots: { index: true, follow: true } };
+  }
+}
+
 
   try {
     const rows = await sql/* sql */`
