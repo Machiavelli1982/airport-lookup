@@ -1,22 +1,12 @@
-import { NextResponse } from "next/server";
+import { MetadataRoute } from 'next';
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
-export function GET() {
-  const txt = `User-agent: *
-Allow: /
-
-Disallow: /a/
-Disallow: /api/
-
-Sitemap: https://www.airportlookup.com/sitemap.xml
-`;
-
-  return new NextResponse(txt, {
-    headers: {
-      "Content-Type": "text/plain; charset=utf-8",
-      "Cache-Control": "public, max-age=3600",
+export default function robots(): MetadataRoute.Robots {
+  return {
+    rules: {
+      userAgent: '*',
+      allow: '/',
+      disallow: '/api/', // Falls du API-Routen hast
     },
-  });
+    sitemap: 'https://www.airportlookup.com/sitemap.xml',
+  };
 }

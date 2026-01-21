@@ -59,6 +59,10 @@ ${urls}
 </urlset>`;
 
   return new NextResponse(xml, {
-    headers: { "Content-Type": "application/xml; charset=utf-8" },
+    headers: { 
+      "Content-Type": "application/xml; charset=utf-8",
+      // 24 Stunden im Cache behalten, im Hintergrund aktualisieren
+      "Cache-Control": "s-maxage=86400, stale-while-revalidate" 
+    },
   });
 }
