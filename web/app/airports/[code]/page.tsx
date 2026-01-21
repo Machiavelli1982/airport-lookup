@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { headers } from "next/headers";
-import { notFound } from "next/navigation";
-import { sql } from "@/lib/db";
-import type { Metadata } from "next";
+
+
+
 
 export const runtime = "nodejs";
 
@@ -31,9 +31,7 @@ function getBaseUrl() {
 }
 
 
-function norm(input: unknown) {
-  return String(input ?? "").trim().toUpperCase();
-}
+
 
 function codeFromOriginalUri(originalUri: string | null) {
   if (!originalUri) return "";
@@ -47,95 +45,62 @@ function codeFromOriginalUri(originalUri: string | null) {
 
 
 
-export async function generateMetadata({
-  params,
-}: {
-  params: { code?: string };
-}): Promise<Metadata> {
-  // 1) Robust: niemals trim() auf undefined
-  let q = norm(params?.code);
+import type { Metadata } from "next";
+import { sql } from "@/lib/db";
+import { notFound } from "next/navigation";
 
-  // 2) Fallback wie in der Page: x-original-uri (hilft bei bestimmten Requests/Bots)
-  if (!q) {
-    const h = await headers();
-    q = codeFromOriginalUri(h.get("x-original-uri"));
-  }
+function norm(code: string) {
+  return (code ?? "").trim().toUpperCase();
+}
 
-  // 3) Wenn wir immer noch nichts haben: harte, sichere Fallback-Metas
-  if (!q) {
-    const base = getBaseUrl();
-    return {
-      title: "Airport Lookup | MSFS",
-      description:
-        "Fast airport reference for Microsoft Flight Simulator (MSFS): runways, lights, frequencies.",
-      alternates: { canonical: `${base}/` },
-      robots: { index: false, follow: false },
-    };
-  }
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") || "https://www.airportlookup.com";
 
-  // 4) Airport lookup: ICAO oder IATA
+
+
+export async function generateMetadata(
+  { params }: { params: { code: string } }
+): Promise<Metadata> {
+  const code = norm(params?.code);
+  if (!code) return { robots: { index: false, follow: false } };
+
   const rows = await sql/* sql */`
-    SELECT
-      ident,
-      iata_code,
-      name,
-      municipality,
-      iso_country
+    SELECT ident as icao, iata_code as iata, name, municipality as city, iso_country
     FROM airports
-    WHERE ident = ${q} OR iata_code = ${q}
+    WHERE ident = ${code} OR iata_code = ${code}
     LIMIT 1
   `;
+  const a = rows?.[0];
+  if (!a) return { robots: { index: false, follow: false } };
 
-  const airport = rows?.[0];
+  const countryName = a.iso_country ? await lookupCountryName(a.iso_country) : null;
 
-  // Canonical immer auf ICAO normalisieren, wenn vorhanden
-  const base = getBaseUrl();
+  const titleCore = `${a.icao}${a.iata ? ` / ${a.iata}` : ""} — ${a.name}`;
+  const place = [a.city, countryName].filter(Boolean).join(", ");
+  const title = `${titleCore}${place ? ` (${place})` : ""}`;
 
-  if (!airport) {
-    return {
-      title: `${q} Airport | MSFS`,
-      description:
-        "Fast airport reference for Microsoft Flight Simulator (MSFS): runways, lights, frequencies.",
-      alternates: { canonical: `${base}/airports/${q}` },
-      robots: { index: false, follow: false },
-    };
-  }
-
-  const icao = norm(airport.ident) || q;
-  const airportName = String(airport.name ?? icao);
-  const city = airport.municipality ? String(airport.municipality) : "";
-  const iso = airport.iso_country ? String(airport.iso_country) : "";
-
-  const countryName = iso ? await lookupCountryName(iso) : null;
-
-  const placeBits = [city, countryName || iso].filter(Boolean).join(", ");
-
-  // Title: ICAO + Name + Intent + MSFS
-  const title = `${icao} – ${airportName} | Frequencies, Runways & Lights (MSFS)`;
-
-  const description = [
-    `Runway lengths, runway lights and ATC frequencies for ${airportName} (${icao}${
-      placeBits ? `, ${placeBits}` : ""
-    }) in Microsoft Flight Simulator.`,
-    `Fast reference — no addons. Not for real-world navigation.`,
-  ].join(" ");
-
-  const canonicalUrl = `${base}/airports/${icao}`;
+  const desc =
+    `${a.name}${place ? ` in ${place}` : ""}. ` +
+    `MSFS reference: runways (incl. lighting), ATIS/TWR/GND/APP frequencies, and navaids. ` +
+    `Reference only — not for real-world navigation.`;
 
   return {
+    metadataBase: new URL(SITE_URL),
     title,
-    description,
-    alternates: { canonical: canonicalUrl },
+    description: desc,
+    alternates: { canonical: `/airports/${a.icao}` },
+    robots: { index: true, follow: true },
     openGraph: {
+      type: "article",
+      url: `/airports/${a.icao}`,
       title,
-      description,
-      url: canonicalUrl,
+      description: desc,
       siteName: "Airport Lookup",
-      type: "website",
     },
-    twitter: { card: "summary", title, description },
+    twitter: { card: "summary", title, description: desc },
   };
 }
+
 
 
 
