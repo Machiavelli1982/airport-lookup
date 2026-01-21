@@ -56,49 +56,83 @@ function norm(code: string) {
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") || "https://www.airportlookup.com";
 
-
-
 export async function generateMetadata(
   { params }: { params: { code: string } }
 ): Promise<Metadata> {
   const code = norm(params?.code);
+
+  // Ungültige Requests (leer / nonsense) dürfen noindex sein
   if (!code) return { robots: { index: false, follow: false } };
 
-  const rows = await sql/* sql */`
-    SELECT ident as icao, iata_code as iata, name, municipality as city, iso_country
-    FROM airports
-    WHERE ident = ${code} OR iata_code = ${code}
-    LIMIT 1
-  `;
-  const a = rows?.[0];
-  if (!a) return { robots: { index: false, follow: false } };
-
-  const countryName = a.iso_country ? await lookupCountryName(a.iso_country) : null;
-
-  const titleCore = `${a.icao}${a.iata ? ` / ${a.iata}` : ""} — ${a.name}`;
-  const place = [a.city, countryName].filter(Boolean).join(", ");
-  const title = `${titleCore}${place ? ` (${place})` : ""}`;
-
-  const desc =
-    `${a.name}${place ? ` in ${place}` : ""}. ` +
-    `MSFS reference: runways (incl. lighting), ATIS/TWR/GND/APP frequencies, and navaids. ` +
-    `Reference only — not for real-world navigation.`;
-
-  return {
+  // Fallback-Metadata: IMMER indexierbar + korrekter canonical
+  const fallback: Metadata = {
     metadataBase: new URL(SITE_URL),
-    title,
-    description: desc,
-    alternates: { canonical: `/airports/${a.icao}` },
+    title: `${code} | Airport Lookup`,
+    description:
+      `MSFS reference for ${code}: runways (incl. lighting), ATIS/TWR/GND/APP frequencies, and navaids. ` +
+      `Reference only — not for real-world navigation.`,
+    alternates: { canonical: `/airports/${code}` },
     robots: { index: true, follow: true },
     openGraph: {
       type: "article",
-      url: `/airports/${a.icao}`,
-      title,
-      description: desc,
+      url: `/airports/${code}`,
+      title: `${code} | Airport Lookup`,
+      description:
+        `MSFS reference for ${code}: runways (incl. lighting), ATIS/TWR/GND/APP frequencies, and navaids. ` +
+        `Reference only — not for real-world navigation.`,
       siteName: "Airport Lookup",
     },
-    twitter: { card: "summary", title, description: desc },
+    twitter: {
+      card: "summary",
+      title: `${code} | Airport Lookup`,
+      description:
+        `MSFS reference for ${code}: runways (incl. lighting), ATIS/TWR/GND/APP frequencies, and navaids. ` +
+        `Reference only — not for real-world navigation.`,
+    },
   };
+
+  try {
+    const rows = await sql/* sql */`
+      SELECT ident as icao, iata_code as iata, name, municipality as city, iso_country
+      FROM airports
+      WHERE ident = ${code} OR iata_code = ${code}
+      LIMIT 1
+    `;
+    const a = rows?.[0];
+
+    // Wenn DB nix findet: trotzdem index + canonical auf code
+    if (!a) return fallback;
+
+    const countryName = a.iso_country ? await lookupCountryName(a.iso_country) : null;
+
+    const titleCore = `${a.icao}${a.iata ? ` / ${a.iata}` : ""} — ${a.name}`;
+    const place = [a.city, countryName].filter(Boolean).join(", ");
+    const title = `${titleCore}${place ? ` (${place})` : ""}`;
+
+    const desc =
+      `${a.name}${place ? ` in ${place}` : ""}. ` +
+      `MSFS reference: runways (incl. lighting), ATIS/TWR/GND/APP frequencies, and navaids. ` +
+      `Reference only — not for real-world navigation.`;
+
+    return {
+      metadataBase: new URL(SITE_URL),
+      title,
+      description: desc,
+      alternates: { canonical: `/airports/${a.icao}` },
+      robots: { index: true, follow: true },
+      openGraph: {
+        type: "article",
+        url: `/airports/${a.icao}`,
+        title,
+        description: desc,
+        siteName: "Airport Lookup",
+      },
+      twitter: { card: "summary", title, description: desc },
+    };
+  } catch {
+    // Wenn DB-Conn / Lookup crasht: trotzdem index + canonical korrekt
+    return fallback;
+  }
 }
 
 
