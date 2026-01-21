@@ -5,7 +5,6 @@ import { sql } from "@/lib/db";
 export const runtime = "nodejs";
 
 function haversineKmSql(lat: number, lon: number) {
-  // Great-circle distance in km
   return sql/* sql */`
     2 * 6371 * asin(
       sqrt(
@@ -19,16 +18,15 @@ function haversineKmSql(lat: number, lon: number) {
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-
   const lat = searchParams.get("lat");
   const lon = searchParams.get("lon");
-  const country = searchParams.get("country"); // ISO country code, e.g. AT, DE
+  const country = searchParams.get("country");
+  const limit = Math.min(Number(searchParams.get("limit") || "12"), 25);
 
-  // 1) Geo mode
+  // 1) Geo mode (User Location)
   if (lat && lon) {
     const latNum = Number(lat);
     const lonNum = Number(lon);
-    const limit = Math.min(Number(searchParams.get("limit") || "12"), 25);
 
     if (!Number.isFinite(latNum) || !Number.isFinite(lonNum)) {
       return NextResponse.json({ error: "Invalid lat/lon" }, { status: 400 });
@@ -51,8 +49,16 @@ export async function GET(req: Request) {
       WHERE
         latitude_deg IS NOT NULL
         AND longitude_deg IS NOT NULL
-        AND type IN ('large_airport','medium_airport')
-      ORDER BY distance_km ASC
+        -- NEU: small_airport hinzugefügt
+        AND type IN ('large_airport','medium_airport','small_airport')
+      ORDER BY 
+        -- Gewichtung: Große Flughäfen erscheinen bei gleicher Distanz eher oben
+        distance_km ASC,
+        CASE type
+          WHEN 'large_airport' THEN 0
+          WHEN 'medium_airport' THEN 1
+          ELSE 2
+        END
       LIMIT ${limit};
     `;
 
@@ -62,9 +68,7 @@ export async function GET(req: Request) {
   // 2) Country fallback mode
   if (country) {
     const cc = country.trim().toUpperCase();
-    const limit = Math.min(Number(searchParams.get("limit") || "12"), 25);
 
-    // Simple relevance: large first, then medium; then by name
     const rows = await sql/* sql */`
       SELECT
         ident as icao,
@@ -78,12 +82,13 @@ export async function GET(req: Request) {
       FROM airports
       WHERE
         iso_country = ${cc}
-        AND type IN ('large_airport','medium_airport')
+        AND type IN ('large_airport','medium_airport','small_airport')
       ORDER BY
         CASE type
           WHEN 'large_airport' THEN 0
           WHEN 'medium_airport' THEN 1
-          ELSE 2
+          WHEN 'small_airport' THEN 2
+          ELSE 3
         END,
         name ASC
       LIMIT ${limit};
@@ -92,8 +97,5 @@ export async function GET(req: Request) {
     return NextResponse.json({ mode: "country", country: cc, items: rows });
   }
 
-  return NextResponse.json(
-    { error: "Provide lat/lon or country" },
-    { status: 400 }
-  );
+  return NextResponse.json({ error: "Provide lat/lon or country" }, { status: 400 });
 }
