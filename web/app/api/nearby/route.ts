@@ -4,6 +4,10 @@ import { sql } from "@/lib/db";
 
 export const runtime = "nodejs";
 
+/**
+ * Berechnet die Distanz in Kilometern auf einer Kugel (Haversine-Formel).
+ * Integriert direkt in den SQL-Query für maximale Performance.
+ */
 function haversineKmSql(lat: number, lon: number) {
   return sql/* sql */`
     2 * 6371 * asin(
@@ -23,13 +27,13 @@ export async function GET(req: Request) {
   const country = searchParams.get("country");
   const limit = Math.min(Number(searchParams.get("limit") || "12"), 25);
 
-  // 1) Geo mode (User Location)
+  // 1) GEOGRAFISCHER MODUS (Nutzer-Standort)
   if (lat && lon) {
     const latNum = Number(lat);
     const lonNum = Number(lon);
 
     if (!Number.isFinite(latNum) || !Number.isFinite(lonNum)) {
-      return NextResponse.json({ error: "Invalid lat/lon" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid coordinates" }, { status: 400 });
     }
 
     const distanceKm = haversineKmSql(latNum, lonNum);
@@ -41,23 +45,22 @@ export async function GET(req: Request) {
         name,
         municipality,
         iso_country,
-        latitude_deg,
-        longitude_deg,
         type,
         (${distanceKm}) as distance_km
       FROM airports
       WHERE
         latitude_deg IS NOT NULL
         AND longitude_deg IS NOT NULL
-        -- NEU: small_airport hinzugefügt
-        AND type IN ('large_airport','medium_airport','small_airport')
+        -- NEU: Wir beziehen nun auch kleine Plätze und Heliports mit ein
+        AND type IN ('large_airport','medium_airport','small_airport','heliport')
       ORDER BY 
-        -- Gewichtung: Große Flughäfen erscheinen bei gleicher Distanz eher oben
         distance_km ASC,
+        -- Bei gleicher Distanz priorisieren wir größere Plätze
         CASE type
           WHEN 'large_airport' THEN 0
           WHEN 'medium_airport' THEN 1
-          ELSE 2
+          WHEN 'small_airport' THEN 2
+          ELSE 3
         END
       LIMIT ${limit};
     `;
@@ -65,7 +68,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ mode: "geo", items: rows });
   }
 
-  // 2) Country fallback mode
+  // 2) FALLBACK MODUS (Nach Land)
   if (country) {
     const cc = country.trim().toUpperCase();
 
@@ -75,14 +78,11 @@ export async function GET(req: Request) {
         iata_code as iata,
         name,
         municipality,
-        iso_country,
-        latitude_deg,
-        longitude_deg,
         type
       FROM airports
       WHERE
         iso_country = ${cc}
-        AND type IN ('large_airport','medium_airport','small_airport')
+        AND type IN ('large_airport','medium_airport','small_airport','heliport')
       ORDER BY
         CASE type
           WHEN 'large_airport' THEN 0
