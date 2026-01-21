@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -19,34 +20,19 @@ const SITE_URL =
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Airport Lookup [DEPLOY MARK 210126]",
+    default: "Airport Lookup",
     template: "%s | Airport Lookup",
   },
   description:
     "Fast airport reference for MSFS 2020/2024: runways (incl. lighting), frequencies, and navaids. Reference only — not for real-world navigation.",
-  robots: {
-    index: true,
-    follow: true,
-  },
-  // optional (wenn du es möchtest, aber ohne MM23):
-  // applicationName: "Airport Lookup",
-  // generator: "Airport Lookup",
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <head>
-        <script
-          defer
-          data-domain="airportlookup.com"
-          src="https://plausible.io/js/script.js"
-        />
-      </head>
       <body
         className={`
           ${geistSans.variable}
@@ -55,7 +41,14 @@ export default function RootLayout({
           overflow-x-hidden
         `}
       >
+        <Script
+          data-domain="airportlookup.com"
+          src="https://plausible.io/js/script.js"
+          strategy="afterInteractive"
+        />
+
         {children}
+
         <footer className="mt-12 border-t border-neutral-200 dark:border-neutral-800 py-6 text-center text-xs text-neutral-600 dark:text-neutral-400">
           <a
             href="mailto:contact@airportlookup.com"
