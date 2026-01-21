@@ -1,7 +1,6 @@
 // web/app/airports/[code]/page.tsx
 
 import Link from "next/link";
-import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { sql } from "@/lib/db";
@@ -40,7 +39,7 @@ function googleMapsLink(lat: any, lon: any) {
   const la = Number(lat);
   const lo = Number(lon);
   if (!Number.isFinite(la) || !Number.isFinite(lo)) return null;
-  return `https://www.google.com/maps?q=${la},${lo}`;
+  return `https://www.google.com/maps/search/?api=1&query=${la},${lo}`;
 }
 
 function fmtFreqMHz(mhz: any) {
@@ -66,6 +65,20 @@ function surfaceLabel(surface: any) {
   return map[s] ?? surface;
 }
 
+async function lookupCountryName(isoCountry: any) {
+  const code = norm(isoCountry);
+  if (!code) return null;
+  const rows = await sql`SELECT name FROM countries WHERE code = ${code} LIMIT 1`;
+  return rows?.[0]?.name ? String(rows[0].name) : null;
+}
+
+async function lookupRegionName(isoRegion: any) {
+  const code = norm(isoRegion);
+  if (!code) return null;
+  const rows = await sql`SELECT name FROM regions WHERE code = ${code} LIMIT 1`;
+  return rows?.[0]?.name ? String(rows[0].name) : null;
+}
+
 function pickPrimaryFrequency(frequencies: any[]) {
   if (!frequencies?.length) return null;
   const priority = ["TWR", "CTAF", "UNICOM", "AFIS", "GND", "APP", "DEP", "ATIS"];
@@ -78,17 +91,16 @@ function pickPrimaryFrequency(frequencies: any[]) {
 
 const asBool = (v: any) => v === true || v === 1 || v === "1";
 
-/* ----------------------------- SEO (generateMetadata) ----------------------------- */
+/* ----------------------------- SEO ----------------------------- */
 
 type Props = {
   params: Promise<{ code: string }>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const resolvedParams = await params;
-  const code = norm(resolvedParams?.code);
+  const { code: rawCode } = await params;
+  const code = norm(rawCode);
 
-  // Fallback Metadata Objekt - WICHTIG: index: true standardmäßig
   const baseFallback: Metadata = {
     metadataBase: new URL(SITE_URL),
     title: `${code || "Airport"} — Airport Lookup (Runways, Frequencies, Lights)`,
@@ -100,36 +112,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!code) return baseFallback;
 
   try {
-    const rows = await sql`
-      SELECT ident as icao, iata_code as iata, name
-      FROM airports
-      WHERE ident = ${code} OR iata_code = ${code}
-      LIMIT 1
-    `;
+    const rows = await sql`SELECT ident, iata_code, name FROM airports WHERE ident = ${code} OR iata_code = ${code} LIMIT 1`;
     const a = rows?.[0];
+    if (!a?.ident) return baseFallback;
 
-    if (!a?.icao) return baseFallback;
-
-    const codes = `${a.icao}${a.iata ? ` / ${a.iata}` : ""}`;
+    const codes = `${a.ident}${a.iata_code ? ` / ${a.iata_code}` : ""}`;
     const title = `${codes} — ${a.name} (Runways, Frequencies, Lights)`;
-    const desc = `${a.name} (${codes}): runway lengths & lights, frequencies, and navaids for MSFS.`;
-
+    
     return {
       ...baseFallback,
       title,
-      description: desc,
-      alternates: { canonical: `/airports/${a.icao}` },
-      openGraph: {
-        type: "website",
-        url: `/airports/${a.icao}`,
-        title,
-        description: desc,
-        siteName: "Airport Lookup",
-      },
-      twitter: { card: "summary", title, description: desc },
+      alternates: { canonical: `/airports/${a.ident}` },
+      openGraph: { type: "website", url: `/airports/${a.ident}`, title, siteName: "Airport Lookup" },
     };
   } catch (e) {
-    console.error("Metadata Error", e);
     return baseFallback;
   }
 }
@@ -175,35 +171,34 @@ function KV({ k, v }: { k: string; v: any }) {
 /* ------------------------------ MAIN PAGE ------------------------------- */
 
 export default async function AirportPage(props: Props) {
-  const p = await props.params;
-  const code = norm(p?.code);
+  const { code: rawCode } = await props.params;
+  const code = norm(rawCode);
   if (!code) notFound();
 
-  const [airportRows, navaids] = await Promise.all([
-    sql`SELECT * FROM airports WHERE ident = ${code} OR iata_code = ${code} LIMIT 1`,
-    sql`SELECT * FROM navaids WHERE associated_airport = ${code} ORDER BY type ASC, ident ASC`
-  ]);
-
+  const airportRows = await sql`SELECT * FROM airports WHERE ident = ${code} OR iata_code = ${code} LIMIT 1`;
   const airport = airportRows?.[0];
   if (!airport) notFound();
 
-  const [runways, frequencies] = await Promise.all([
+  // Daten-Lookups parallelisieren
+  const [runways, frequencies, navaids, countryName, regionName] = await Promise.all([
     sql`SELECT * FROM runways WHERE airport_ref = ${airport.id} ORDER BY length_ft DESC NULLS LAST`,
-    sql`SELECT * FROM frequencies WHERE airport_ref = ${airport.id} ORDER BY type ASC, frequency_mhz ASC`
+    sql`SELECT * FROM frequencies WHERE airport_ref = ${airport.id} ORDER BY type ASC, frequency_mhz ASC`,
+    sql`SELECT * FROM navaids WHERE associated_airport = ${airport.ident} ORDER BY type ASC, ident ASC`,
+    lookupCountryName(airport.iso_country),
+    lookupRegionName(airport.iso_region)
   ]);
 
   const mapsUrl = googleMapsLink(airport.latitude_deg, airport.longitude_deg);
   const primaryFreq = pickPrimaryFrequency(frequencies);
-  const canonicalUrl = `${SITE_URL}/airports/${airport.ident}`;
+  const associatedTop = (navaids ?? []).slice(0, 3);
 
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Airport",
     name: airport.name,
-    iataCode: airport.iata_code,
     icaoCode: airport.ident,
     geo: { "@type": "GeoCoordinates", latitude: airport.latitude_deg, longitude: airport.longitude_deg },
-    url: canonicalUrl,
+    url: `${SITE_URL}/airports/${airport.ident}`,
   };
 
   return (
@@ -211,59 +206,124 @@ export default async function AirportPage(props: Props) {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       
       <div style={{ marginBottom: 12 }}>
-        <Link href="/" style={{ color: "var(--foreground)", textDecoration: "none", fontWeight: 600, opacity: 0.9 }}>← Back</Link>
+        <Link href="/" style={{ color: "var(--foreground)", textDecoration: "none", fontWeight: 600 }}>← Back</Link>
       </div>
 
-      <h1 style={{ fontSize: 44, letterSpacing: -0.5, margin: "8px 0 6px", fontWeight: 700 }}>{airport.ident}</h1>
+      <h1 style={{ fontSize: 44, margin: "8px 0 2px", fontWeight: 700 }}>{airport.ident}</h1>
+      <p style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 700, background: "#f0f0f0", display: "inline-block", padding: "4px 10px", borderRadius: 6, color: "#333", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+        Reference only — not for real-world navigation.
+      </p>
       <p style={{ margin: 0, fontSize: 18, color: "var(--muted)", fontWeight: 500 }}>{airport.name}</p>
 
-      <div style={{ height: 18 }} />
+      <div style={{ height: 24 }} />
 
       <div style={{ display: "grid", gap: 14 }}>
-        <Card title="Key Facts" subtitle="At-a-glance sim reference.">
-          <div style={{ display: "grid", gap: 10 }}>
-            {/* Runway Summary */}
+        {/* Key Facts */}
+        <Card title="Key Facts" subtitle="At-a-glance sim reference (runway, elevation, comm).">
+          <div style={{ display: "grid", gap: 12 }}>
             <div style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 12, background: "rgba(255,255,255,0.03)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontWeight: 700, color: "var(--muted)" }}>Runway Summary</span>
-                <div style={{ display: "flex", gap: 8 }}>
-                   {runways.some((r: any) => asBool(r.lighted)) && <Badge text="LIGHTED" tone="ok" />}
-                   {runways.some((r: any) => asBool(r.closed)) && <Badge text="CLOSED" tone="warn" />}
+              <div style={{ fontWeight: 700, color: "var(--muted)", marginBottom: 8 }}>Runway Summary</div>
+              {runways.map((r: any) => (
+                <div key={r.id} style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 14 }}>
+                  <span style={{ fontWeight: 700 }}>{r.le_ident}/{r.he_ident} · {r.length_ft} ft · {surfaceLabel(r.surface)}</span>
+                  <Badge text={asBool(r.lighted) ? "LIGHTED" : "UNLIT"} tone={asBool(r.lighted) ? "ok" : "muted"} />
                 </div>
-              </div>
-              <div style={{ marginTop: 8 }}>
-                {runways.slice(0, 3).map((r: any) => (
-                  <div key={r.id} style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>
-                    {r.le_ident}/{r.he_ident} · {r.length_ft} ft · {surfaceLabel(r.surface)}
-                  </div>
-                ))}
-              </div>
+              ))}
             </div>
 
-            <KV k="Elevation" v={`${fmtFt(airport.elevation_ft)} / ${fmtMFromFt(airport.elevation_ft)}`} />
-            <KV k="Primary Freq" v={primaryFreq ? `${primaryFreq.type} ${fmtFreqMHz(primaryFreq.frequency_mhz)}` : "N/A"} />
+            <KV k="Field Elevation" v={`${fmtFt(airport.elevation_ft)} / ${fmtMFromFt(airport.elevation_ft)}`} />
+            <KV k="Primary / Contact" v={primaryFreq ? `${primaryFreq.type} ${fmtFreqMHz(primaryFreq.frequency_mhz)} (${primaryFreq.description || ""})` : "—"} />
+            
+            <div style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 12, background: "rgba(255,255,255,0.03)" }}>
+              <div style={{ fontWeight: 700, color: "var(--muted)", marginBottom: 8 }}>Associated Navaids (reference only)</div>
+              {associatedTop.map((n: any) => (
+                <div key={n.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 14, fontWeight: 600, marginBottom: 4 }}>
+                  <span>{n.ident} · {n.type} · {n.name}</span>
+                  <span>{fmtNavaidFreq(n.frequency_khz)}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </Card>
 
-        <Card title="Airport Info">
+        {/* Airport Info */}
+        <Card title="Airport Info" subtitle="Name, codes, location, coordinates, elevation.">
           <KV k="Name" v={airport.name} />
           <KV k="Codes" v={`${airport.iata_code || "—"} / ${airport.ident}`} />
-          <KV k="Municipality" v={airport.municipality} />
-          <KV k="Coordinates" v={mapsUrl ? <a href={mapsUrl} target="_blank" style={{ color: "inherit" }}>{fmtCoord(airport.latitude_deg)}, {fmtCoord(airport.longitude_deg)}</a> : "—"} />
-          {isNonEmpty(airport.wikipedia_link) && <KV k="Wikipedia" v={<a href={airport.wikipedia_link} target="_blank" style={{ color: "inherit" }}>Open Article</a>} />}
+          <KV k="Type" v={airport.type} />
+          <KV k="City" v={airport.municipality} />
+          <KV
+            k="Country"
+            v={airport.iso_country ? `${airport.iso_country}${countryName ? ` — ${countryName}` : ""}` : "—"}
+          />
+          <KV
+            k="Region"
+            v={airport.iso_region ? `${airport.iso_region}${regionName ? ` — ${regionName}` : ""}` : "—"}
+          />
+          <KV k="Continent" v={airport.continent} />
+          <KV k="Coordinates" v={mapsUrl ? <a href={mapsUrl} target="_blank" style={{ color: "inherit", fontWeight: 700 }}>{fmtCoord(airport.latitude_deg)}, {fmtCoord(airport.longitude_deg)}</a> : "—"} />
+          <KV k="Elevation" v={fmtFt(airport.elevation_ft)} />
+          {isNonEmpty(airport.wikipedia_link) && <KV k="Wikipedia" v={<a href={airport.wikipedia_link} target="_blank" style={{ color: "inherit" }}>{airport.wikipedia_link}</a>} />}
+          {isNonEmpty(airport.home_link) && <KV k="Website" v={<a href={airport.home_link} target="_blank" style={{ color: "inherit" }}>{airport.home_link}</a>} />}
+          
+          {isNonEmpty(airport.keywords) && (
+            <div style={{ marginTop: 12, padding: 12, background: "rgba(0,0,0,0.03)", borderRadius: 8, fontSize: 13 }}>
+              <strong style={{ display: "block", marginBottom: 4 }}>Keywords:</strong> {airport.keywords}
+            </div>
+          )}
         </Card>
 
-        <Card title="Frequencies">
+        {/* Runways Detail */}
+        <Card title="Runways" subtitle="Runway list (length, surface, heading, lights).">
+          {runways.map((r: any) => (
+            <div key={r.id} style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 12, marginBottom: 10, background: "rgba(255,255,255,0.03)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                <span style={{ fontWeight: 800, fontSize: 18 }}>{r.le_ident} / {r.he_ident}</span>
+                <Badge text={asBool(r.lighted) ? "LIGHTED" : "UNLIT"} tone={asBool(r.lighted) ? "ok" : "muted"} />
+              </div>
+              <div style={{ color: "var(--muted)", fontWeight: 600, fontSize: 14 }}>
+                {r.length_ft ? `${r.length_ft} ft / ${fmtMFromFt(r.length_ft)}` : "—"}
+                {" · "}
+                {r.width_ft ? `${r.width_ft} ft / ${fmtMFromFt(r.width_ft)} wide` : "— wide"}
+                {" · "}
+                {surfaceLabel(r.surface)}
+                <br />
+                HDG {r.le_heading_degt ?? "—"}° / {r.he_heading_degt ?? "—"}°
+              </div>
+            </div>
+          ))}
+        </Card>
+
+        {/* Frequencies */}
+        <Card title="Frequencies" subtitle="TWR, GND, ATIS, APP, etc.">
           {frequencies.map((f: any) => (
-            <KV key={f.id} k={f.type} v={`${fmtFreqMHz(f.frequency_mhz)} (${f.description || "No desc"})`} />
+            <div key={f.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+              <div style={{ fontWeight: 700 }}>{f.type} <span style={{ color: "var(--muted)", fontWeight: 500, marginLeft: 8 }}>{f.description}</span></div>
+              <div style={{ fontWeight: 800 }}>{fmtFreqMHz(f.frequency_mhz)}</div>
+            </div>
           ))}
         </Card>
 
-        <Card title="Navaids">
+        {/* Navaids */}
+        <Card title="Navaids" subtitle="VOR/NDB/DME (dataset where available).">
           {navaids.map((n: any) => (
-            <KV key={n.id} k={`${n.type} ${n.ident}`} v={fmtNavaidFreq(n.frequency_khz)} />
+            <div key={n.id} style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 12, marginBottom: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800 }}>
+                <span>{n.ident} · {n.type}</span>
+                <span>{fmtNavaidFreq(n.frequency_khz)}</span>
+              </div>
+              <div style={{ color: "var(--muted)", fontSize: 14, marginTop: 4, fontWeight: 600 }}>
+                {n.name} <br />
+                {fmtCoord(n.latitude_deg)}, {fmtCoord(n.longitude_deg)} · {fmtFt(n.elevation_ft)}
+                {n.dme_channel && <div style={{ color: "var(--foreground)", marginTop: 4 }}>DME: CH {n.dme_channel} · {Math.round(n.dme_frequency_khz)} kHz</div>}
+              </div>
+            </div>
           ))}
         </Card>
+
+        <div style={{ padding: "10px 2px", color: "var(--muted)", fontSize: 14, fontWeight: 500 }}>
+          Data: OurAirports (Public Domain). No guarantee of accuracy.
+        </div>
       </div>
     </main>
   );
