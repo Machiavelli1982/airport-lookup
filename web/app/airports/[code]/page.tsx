@@ -1,23 +1,18 @@
 // web/app/airports/[code]/page.tsx
-import type { Metadata } from "next";
+
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { sql } from "@/lib/db";
+
 
 export const runtime = "nodejs";
 export const revalidate = 86400; // 24h
 
 const FALLBACK_BASE = "https://www.airportlookup.com";
 
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ||
-  process.env.VERCEL_PROJECT_PRODUCTION_URL?.replace(/\/+$/, "") ||
-  FALLBACK_BASE;
 
-function norm(code: string) {
-  return (code ?? "").trim().toUpperCase();
-}
+
+
 
 function getBaseUrl() {
   const raw =
@@ -42,11 +37,34 @@ function codeFromOriginalUri(originalUri: string | null) {
 
 /* ----------------------------- SEO ----------------------------- */
 
+import type { Metadata } from "next";
+import { sql } from "@/lib/db";
+
+function norm(code: string) {
+  return (code ?? "").trim().toUpperCase();
+}
+
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ||
+  "https://www.airportlookup.com";
+
 export async function generateMetadata(
   { params }: { params: { code: string } }
 ): Promise<Metadata> {
   const code = norm(params?.code);
-  if (!code) return { robots: { index: false, follow: false } };
+
+  // wirklich kaputte Requests -> noindex ok, aber trotzdem title setzen
+  const baseFallback: Metadata = {
+    metadataBase: new URL(SITE_URL),
+    title: `${code || "Airport"} — Airport Lookup (Runways, Frequencies, Lights)`,
+    description:
+      `Airport ${code || ""}: runway lengths & lights, ATIS/TWR/GND/APP frequencies, ` +
+      `and navaids for MSFS 2020/2024. Fast mobile lookup.`,
+    alternates: { canonical: `/airports/${code || ""}` },
+    robots: { index: !!code, follow: !!code },
+  };
+
+  if (!code) return baseFallback;
 
   try {
     const rows = await sql/* sql */`
@@ -57,19 +75,15 @@ export async function generateMetadata(
     `;
 
     const a = rows?.[0];
-    if (!a?.icao || !a?.name) {
-      // unknown code => don't index thin/invalid pages
-      return { robots: { index: false, follow: false } };
-    }
+
+    // DB findet nix -> trotzdem index + canonical auf eingegebenen Code
+    if (!a?.icao || !a?.name) return baseFallback;
 
     const codes = `${a.icao}${a.iata ? ` / ${a.iata}` : ""}`;
-
-    // CTR-first
     const title = `${codes} — ${a.name} (Runways, Frequencies, Lights)`;
     const desc =
-      `${a.icao}${a.iata ? ` (${a.iata})` : ""} ${a.name}: ` +
-      `runway lengths & lights, ATIS/TWR/GND/APP frequencies, and navaids for MSFS 2020/2024. ` +
-      `Fast, mobile-first lookup.`;
+      `${a.name} (${codes}): runway lengths & lights, ATIS/TWR/GND/APP frequencies, ` +
+      `and navaids for MSFS 2020/2024. Fast mobile lookup.`;
 
     return {
       metadataBase: new URL(SITE_URL),
@@ -78,7 +92,7 @@ export async function generateMetadata(
       alternates: { canonical: `/airports/${a.icao}` },
       robots: { index: true, follow: true },
       openGraph: {
-        type: "article",
+        type: "website",
         url: `/airports/${a.icao}`,
         title,
         description: desc,
@@ -86,13 +100,12 @@ export async function generateMetadata(
       },
       twitter: { card: "summary", title, description: desc },
     };
-  } catch (e) {
-    console.error("generateMetadata failed:", e);
-    // If metadata fails, better to avoid accidental noindex-flapping on valid pages:
-    // return indexable defaults (page itself will still 404 on unknown airports).
-    return { robots: { index: true, follow: true } };
+  } catch {
+    // Fehler -> trotzdem indexable fallback
+    return baseFallback;
   }
 }
+
 
 /* ----------------------------- helpers ----------------------------- */
 
