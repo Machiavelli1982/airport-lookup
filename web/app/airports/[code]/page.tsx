@@ -1,17 +1,23 @@
+// web/app/airports/[code]/page.tsx
+import type { Metadata } from "next";
 import Link from "next/link";
 import { headers } from "next/headers";
-
-
-
+import { notFound } from "next/navigation";
+import { sql } from "@/lib/db";
 
 export const runtime = "nodejs";
-
 export const revalidate = 86400; // 24h
 
-
-
-
 const FALLBACK_BASE = "https://www.airportlookup.com";
+
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ||
+  process.env.VERCEL_PROJECT_PRODUCTION_URL?.replace(/\/+$/, "") ||
+  FALLBACK_BASE;
+
+function norm(code: string) {
+  return (code ?? "").trim().toUpperCase();
+}
 
 function getBaseUrl() {
   const raw =
@@ -21,17 +27,11 @@ function getBaseUrl() {
 
   const cleaned = String(raw).trim().replace(",", ".").replace(/\/$/, "");
 
-  // if already has scheme, normalize to https
   if (/^https?:\/\//i.test(cleaned)) {
     return cleaned.replace(/^http:\/\//i, "https://");
   }
-
-  // otherwise, add https://
   return `https://${cleaned.replace(/^\/+/, "")}`;
 }
-
-
-
 
 function codeFromOriginalUri(originalUri: string | null) {
   if (!originalUri) return "";
@@ -40,30 +40,15 @@ function codeFromOriginalUri(originalUri: string | null) {
   return m ? norm(decodeURIComponent(m[1])) : "";
 }
 
-
-
-
-
-
-import type { Metadata } from "next";
-import { sql } from "@/lib/db";
-import { notFound } from "next/navigation";
-
-function norm(code: string) {
-  return (code ?? "").trim().toUpperCase();
-}
-
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ||
-  "https://www.airportlookup.com";
+/* ----------------------------- SEO ----------------------------- */
 
 export async function generateMetadata(
   { params }: { params: { code: string } }
 ): Promise<Metadata> {
-  try {
-    const code = norm(params?.code);
-    if (!code) return { robots: { index: false, follow: false } };
+  const code = norm(params?.code);
+  if (!code) return { robots: { index: false, follow: false } };
 
+  try {
     const rows = await sql/* sql */`
       SELECT ident as icao, iata_code as iata, name
       FROM airports
@@ -72,14 +57,15 @@ export async function generateMetadata(
     `;
 
     const a = rows?.[0];
-    if (!a?.icao || !a?.name) return { robots: { index: false, follow: false } };
+    if (!a?.icao || !a?.name) {
+      // unknown code => don't index thin/invalid pages
+      return { robots: { index: false, follow: false } };
+    }
 
     const codes = `${a.icao}${a.iata ? ` / ${a.iata}` : ""}`;
 
-    // CTR-first Title: Codes + Name + 1-line value proposition
+    // CTR-first
     const title = `${codes} — ${a.name} (Runways, Frequencies, Lights)`;
-
-    // Description: konkret + MSFS intent, ohne Disclaimer
     const desc =
       `${a.icao}${a.iata ? ` (${a.iata})` : ""} ${a.name}: ` +
       `runway lengths & lights, ATIS/TWR/GND/APP frequencies, and navaids for MSFS 2020/2024. ` +
@@ -102,65 +88,13 @@ export async function generateMetadata(
     };
   } catch (e) {
     console.error("generateMetadata failed:", e);
+    // If metadata fails, better to avoid accidental noindex-flapping on valid pages:
+    // return indexable defaults (page itself will still 404 on unknown airports).
     return { robots: { index: true, follow: true } };
   }
 }
 
-
-  try {
-    const rows = await sql/* sql */`
-      SELECT ident as icao, iata_code as iata, name, municipality as city, iso_country
-      FROM airports
-      WHERE ident = ${code} OR iata_code = ${code}
-      LIMIT 1
-    `;
-    const a = rows?.[0];
-
-    // Wenn DB nix findet: trotzdem index + canonical auf code
-    if (!a) return fallback;
-
-    const countryName = a.iso_country ? await lookupCountryName(a.iso_country) : null;
-
-    const titleCore = `${a.icao}${a.iata ? ` / ${a.iata}` : ""} — ${a.name}`;
-    const place = [a.city, countryName].filter(Boolean).join(", ");
-    const title = `${titleCore}${place ? ` (${place})` : ""}`;
-
-    const desc =
-      `${a.name}${place ? ` in ${place}` : ""}. ` +
-      `MSFS reference: runways (incl. lighting), ATIS/TWR/GND/APP frequencies, and navaids. ` +
-      `Reference only — not for real-world navigation.`;
-
-    return {
-      metadataBase: new URL(SITE_URL),
-      title,
-      description: desc,
-      alternates: { canonical: `/airports/${a.icao}` },
-      robots: { index: true, follow: true },
-      openGraph: {
-        type: "article",
-        url: `/airports/${a.icao}`,
-        title,
-        description: desc,
-        siteName: "Airport Lookup",
-      },
-      twitter: { card: "summary", title, description: desc },
-    };
-  } catch {
-    // Wenn DB-Conn / Lookup crasht: trotzdem index + canonical korrekt
-    return fallback;
-  }
-}
-
-
-
-
-
-
-
-
 /* ----------------------------- helpers ----------------------------- */
-
-
 
 function isNonEmpty(s: any) {
   return typeof s === "string" && s.trim().length > 0;
@@ -200,39 +134,10 @@ function fmtFreqMHz(mhz: any) {
 function fmtNavaidFreq(freq_khz: any) {
   const x = Number(freq_khz);
   if (!Number.isFinite(x)) return null;
-  // OurAirports: NDB in kHz; VOR/LOC/etc stored as kHz but represent MHz band
+  // OurAirports: NDB in kHz; VOR/LOC/etc often stored as kHz but represent MHz band
   if (x >= 100000) return `${(x / 1000).toFixed(2)} MHz`;
   return `${Math.round(x)} kHz`;
 }
-
-
-async function lookupCountryName(isoCountry: any) {
-  const code = norm(isoCountry);
-  if (!code) return null;
-
-  const rows = await sql/* sql */`
-    SELECT name
-    FROM countries
-    WHERE code = ${code}
-    LIMIT 1
-  `;
-  return rows?.[0]?.name ? String(rows[0].name) : null;
-}
-
-
-async function lookupRegionName(isoRegion: any) {
-  const code = norm(isoRegion);
-  if (!code) return null;
-
-  const rows = await sql/* sql */`
-    SELECT name
-    FROM regions
-    WHERE code = ${code}
-    LIMIT 1
-  `;
-  return rows?.[0]?.name ? String(rows[0].name) : null;
-}
-
 
 function surfaceLabel(surface: any) {
   const s = String(surface ?? "").trim().toUpperCase();
@@ -254,13 +159,12 @@ function surfaceLabel(surface: any) {
     UNK: "Unknown",
   };
 
-  return map[s] ?? surface; // fallback: original value
+  return map[s] ?? surface;
 }
 
 function pickPrimaryFrequency(frequencies: any[]) {
   if (!frequencies?.length) return null;
 
-  // Sim-friendly: "first thing you'd try" (still reference-only)
   const priority = ["TWR", "CTAF", "UNICOM", "AFIS", "GND", "APP", "DEP", "ATIS"];
 
   const rank = (t: any) => {
@@ -340,16 +244,11 @@ function Card(props: { title: string; subtitle?: string; children?: any }) {
           {props.subtitle}
         </p>
       ) : null}
-      {props.children ? (
-        <div style={{ marginTop: 14, minWidth: 0 }}>{props.children}</div>
-      ) : null}
+      {props.children ? <div style={{ marginTop: 14, minWidth: 0 }}>{props.children}</div> : null}
     </section>
   );
 }
 
-/**
- * Mobile-stable KV row: key can shrink; value wraps long tokens.
- */
 function KV(props: { k: string; v: any }) {
   return (
     <div
@@ -434,14 +333,6 @@ export default async function AirportPage(props: any) {
   `;
   const airport = airportRows?.[0];
   if (!airport) notFound();
-const countryName = airport.iso_country
-  ? await lookupCountryName(airport.iso_country)
-  : null;
-
-const regionName = airport.iso_region
-  ? await lookupRegionName(airport.iso_region)
-  : null;
-
 
   const runways = await sql/* sql */`
     SELECT
@@ -495,14 +386,12 @@ const regionName = airport.iso_region
   const mapsUrl = googleMapsLink(airport.latitude_deg, airport.longitude_deg);
 
   const primaryFreq = pickPrimaryFrequency(frequencies);
-  const longest = runways?.[0] ?? null;
-
   const showGps =
     isNonEmpty(airport.gps_code) && norm(airport.gps_code) !== norm(airport.ident);
 
   const associatedTop = (navaids ?? []).slice(0, 3);
 
-  // Lighting summary (sim reference)
+  // Lighting summary
   const totalRunways = runways.length;
   const lightedCount = runways.filter((r: any) => asBool(r.lighted)).length;
   const closedCount = runways.filter((r: any) => asBool(r.closed)).length;
@@ -512,7 +401,7 @@ const regionName = airport.iso_region
       ? null
       : lightedCount > 0
       ? { text: `LIGHTED ${lightedCount}/${totalRunways}`, tone: "ok" as const }
-      : { text: "UNLIT (per dataset)", tone: "muted" as const };
+      : { text: "UNLIT (dataset)", tone: "muted" as const };
 
   const closedBadge =
     totalRunways === 0
@@ -520,22 +409,23 @@ const regionName = airport.iso_region
       : closedCount > 0
       ? { text: `CLOSED ${closedCount}`, tone: "warn" as const }
       : null;
-const base = getBaseUrl();
-const canonicalUrl = `${base}/airports/${airport.ident}`;
 
-const jsonLd = {
-  "@context": "https://schema.org",
-  "@type": "Airport",
-  name: airport.name || airport.ident,
-  iataCode: airport.iata_code || undefined,
-  icaoCode: airport.ident || undefined,
-  geo: {
-    "@type": "GeoCoordinates",
-    latitude: Number(airport.latitude_deg),
-    longitude: Number(airport.longitude_deg),
-  },
-  url: canonicalUrl,
-};
+  const base = getBaseUrl();
+  const canonicalUrl = `${base}/airports/${airport.ident}`;
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Airport",
+    name: airport.name || airport.ident,
+    iataCode: airport.iata_code || undefined,
+    icaoCode: airport.ident || undefined,
+    geo: {
+      "@type": "GeoCoordinates",
+      latitude: Number(airport.latitude_deg),
+      longitude: Number(airport.longitude_deg),
+    },
+    url: canonicalUrl,
+  };
 
   return (
     <main
@@ -546,10 +436,11 @@ const jsonLd = {
         fontFamily: "system-ui",
         minWidth: 0,
       }}
-    ><script
-  type="application/ld+json"
-  dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-/>
+    >
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
 
       <div style={{ marginBottom: 12 }}>
         <Link
@@ -580,135 +471,121 @@ const jsonLd = {
         {airport.ident}
       </h1>
       <p style={{ margin: 0, fontSize: 18, color: "var(--muted)", fontWeight: 500 }}>
-        Reference only — not for real-world navigation.
+        {airport.name ?? "—"}
       </p>
 
       <div style={{ height: 18 }} />
 
       <div style={{ display: "grid", gap: 14, minWidth: 0 }}>
         {/* Key Facts */}
-        <Card
-          title="Key Facts"
-          subtitle="At-a-glance sim reference (runway, elevation, comm)."
-        >
+        <Card title="Key Facts" subtitle="At-a-glance sim reference (runway, elevation, comm).">
           <div style={{ display: "grid", gap: 10, minWidth: 0 }}>
-{/* Runway Summary */}
-<div
-  style={{
-    border: "1px solid var(--border)",
-    borderRadius: 14,
-    padding: 12,
-    background: "rgba(255,255,255,0.03)",
-    minWidth: 0,
-  }}
->
-  <div
-    style={{
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "baseline",
-      gap: 12,
-      flexWrap: "wrap",
-      minWidth: 0,
-    }}
-  >
-    <div
-      style={{
-        fontWeight: 700,
-        color: "var(--muted)",
-        flex: "1 1 160px",
-        minWidth: 0,
-      }}
-    >
-      Runway Summary
-    </div>
-
-    <div
-      style={{
-        display: "flex",
-        gap: 8,
-        flexWrap: "wrap",
-        justifyContent: "flex-end",
-        flex: "0 0 auto",
-        maxWidth: "100%",
-      }}
-    >
-      {lightingBadge ? (
-        <Badge text={lightingBadge.text} tone={lightingBadge.tone} />
-      ) : null}
-      {closedBadge ? (
-        <Badge text={closedBadge.text} tone={closedBadge.tone} />
-      ) : null}
-    </div>
-  </div>
-
-  {runways.length === 0 ? (
-    <div style={{ marginTop: 6, color: "var(--muted)", fontWeight: 600 }}>
-      No runway data available.
-    </div>
-  ) : (
-    <div style={{ marginTop: 8, display: "grid", gap: 6, minWidth: 0 }}>
-      {runways.map((r: any) => {
-        const lighted = asBool(r.lighted);
-        const closed = asBool(r.closed);
-
-        return (
-          <div
-            key={r.id}
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "baseline",
-              gap: 10,
-              flexWrap: "wrap",
-              minWidth: 0,
-            }}
-          >
+            {/* Runway Summary */}
             <div
               style={{
+                border: "1px solid var(--border)",
+                borderRadius: 14,
+                padding: 12,
+                background: "rgba(255,255,255,0.03)",
                 minWidth: 0,
-                flex: "1 1 240px",
-                overflowWrap: "anywhere",
-                wordBreak: "break-word",
-                fontWeight: 700,
               }}
             >
-              {r.le_ident ?? "—"} / {r.he_ident ?? "—"}
-              <span style={{ color: "var(--muted)", fontWeight: 600 }}>
-                {" "}
-                ·{" "}
-                {r.length_ft
-                  ? `${r.length_ft} ft / ${fmtMFromFt(r.length_ft)}`
-                  : "—"}{" "}
-· {surfaceLabel(r.surface)}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "baseline",
+                  gap: 12,
+                  flexWrap: "wrap",
+                  minWidth: 0,
+                }}
+              >
+                <div
+                  style={{
+                    fontWeight: 700,
+                    color: "var(--muted)",
+                    flex: "1 1 160px",
+                    minWidth: 0,
+                  }}
+                >
+                  Runway Summary
+                </div>
 
-              </span>
-            </div>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    flexWrap: "wrap",
+                    justifyContent: "flex-end",
+                    flex: "0 0 auto",
+                    maxWidth: "100%",
+                  }}
+                >
+                  {lightingBadge ? <Badge text={lightingBadge.text} tone={lightingBadge.tone} /> : null}
+                  {closedBadge ? <Badge text={closedBadge.text} tone={closedBadge.tone} /> : null}
+                </div>
+              </div>
 
-            <div
-              style={{
-                display: "flex",
-                gap: 6,
-                flexWrap: "wrap",
-                justifyContent: "flex-end",
-                flex: "0 0 auto",
-                maxWidth: "100%",
-              }}
-            >
-              {closed ? <Badge text="CLOSED" tone="warn" /> : null}
-              {lighted ? (
-                <Badge text="LIGHTED" tone="ok" />
+              {runways.length === 0 ? (
+                <div style={{ marginTop: 6, color: "var(--muted)", fontWeight: 600 }}>
+                  No runway data available.
+                </div>
               ) : (
-                <Badge text="UNLIT" tone="muted" />
+                <div style={{ marginTop: 8, display: "grid", gap: 6, minWidth: 0 }}>
+                  {runways.map((r: any) => {
+                    const lighted = asBool(r.lighted);
+                    const closed = asBool(r.closed);
+
+                    return (
+                      <div
+                        key={r.id}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "baseline",
+                          gap: 10,
+                          flexWrap: "wrap",
+                          minWidth: 0,
+                        }}
+                      >
+                        <div
+                          style={{
+                            minWidth: 0,
+                            flex: "1 1 240px",
+                            overflowWrap: "anywhere",
+                            wordBreak: "break-word",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {r.le_ident ?? "—"} / {r.he_ident ?? "—"}
+                          <span style={{ color: "var(--muted)", fontWeight: 600 }}>
+                            {" "}
+                            ·{" "}
+                            {r.length_ft ? `${r.length_ft} ft / ${fmtMFromFt(r.length_ft)}` : "—"}
+                            {" · "}
+                            {surfaceLabel(r.surface)}
+                          </span>
+                        </div>
+
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: 6,
+                            flexWrap: "wrap",
+                            justifyContent: "flex-end",
+                            flex: "0 0 auto",
+                            maxWidth: "100%",
+                          }}
+                        >
+                          {closed ? <Badge text="CLOSED" tone="warn" /> : null}
+                          {lighted ? <Badge text="LIGHTED" tone="ok" /> : <Badge text="UNLIT" tone="muted" />}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
-          </div>
-        );
-      })}
-    </div>
-  )}
-</div>
-
 
             {/* Elevation */}
             <div
@@ -739,15 +616,12 @@ const jsonLd = {
                 minWidth: 0,
               }}
             >
-              <div style={{ fontWeight: 700, color: "var(--muted)" }}>
-                Primary / Contact Frequency
-              </div>
+              <div style={{ fontWeight: 700, color: "var(--muted)" }}>Primary / Contact Frequency</div>
 
               {primaryFreq ? (
                 <>
                   <div style={{ marginTop: 6, fontSize: 20, fontWeight: 700, minWidth: 0 }}>
-                    {String(primaryFreq.type ?? "—").toUpperCase()}{" "}
-                    {fmtFreqMHz(primaryFreq.frequency_mhz)}
+                    {String(primaryFreq.type ?? "—").toUpperCase()} {fmtFreqMHz(primaryFreq.frequency_mhz)}
                   </div>
                   <div
                     style={{
@@ -779,12 +653,7 @@ const jsonLd = {
                 minWidth: 0,
               }}
             >
-              <div style={{ fontWeight: 700, color: "var(--muted)" }}>
-                Associated Navaids{" "}
-                <span style={{ fontWeight: 600, color: "var(--foreground)" }}>
-                  (reference only)
-                </span>
-              </div>
+              <div style={{ fontWeight: 700, color: "var(--muted)" }}>Associated Navaids</div>
 
               {associatedTop.length === 0 ? (
                 <div style={{ marginTop: 6, color: "var(--muted)", fontWeight: 600 }}>
@@ -819,10 +688,7 @@ const jsonLd = {
                           · {n.type ?? "—"}
                         </span>
                         {n.name ? (
-                          <span style={{ color: "var(--muted)", fontWeight: 500 }}>
-                            {" "}
-                            · {n.name}
-                          </span>
+                          <span style={{ color: "var(--muted)", fontWeight: 500 }}> · {n.name}</span>
                         ) : null}
                       </div>
 
@@ -844,110 +710,6 @@ const jsonLd = {
             </div>
           </div>
         </Card>
-{/* SEO Quick Guide (frozen exception, compact) */}
-<section
-  style={{
-    border: "1px solid var(--border)",
-    borderRadius: 18,
-    padding: 16,
-    background: "rgba(255,255,255,0.02)",
-    minWidth: 0,
-    maxWidth: "100%",
-  }}
->
-  <h2
-    style={{
-      fontSize: 18,
-      margin: 0,
-      color: "var(--foreground)",
-      fontWeight: 800,
-      letterSpacing: -0.2,
-    }}
-  >
-    {airport.ident} in MSFS 2020 / 2024: frequencies, runways, lights
-  </h2>
-
-  <p style={{ margin: "8px 0 0", color: "var(--muted)", fontWeight: 500, lineHeight: 1.45 }}>
-    {airport.name ? (
-      <>
-        <strong style={{ color: "var(--foreground)" }}>{airport.name}</strong>{" "}
-        {airport.municipality ? <>in {airport.municipality}</> : null}
-        {airport.iso_country ? <> ({airport.iso_country})</> : null}
-        {" "}— sim reference for quick ATC & runway planning.
-      </>
-    ) : (
-      <>Sim reference for quick ATC & runway planning.</>
-    )}
-  </p>
-
-  <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
-    {/* Runway sentence */}
-    <p style={{ margin: 0, color: "var(--muted)", fontWeight: 500, lineHeight: 1.45 }}>
-      <strong style={{ color: "var(--foreground)" }}>Runways:</strong>{" "}
-      {totalRunways > 0 ? (
-        <>
-          {totalRunways} listed.{" "}
-          {runways.length > 0 ? (
-            <>
-              Longest is{" "}
-              <strong style={{ color: "var(--foreground)" }}>
-                {runways[0]?.le_ident ?? "—"}/{runways[0]?.he_ident ?? "—"}
-              </strong>{" "}
-              at{" "}
-              <strong style={{ color: "var(--foreground)" }}>
-                {runways[0]?.length_ft ? `${runways[0].length_ft} ft` : "—"}
-              </strong>
-              {" "}({runways[0]?.length_ft ? fmtMFromFt(runways[0].length_ft) : "—"}).
-            </>
-          ) : null}{" "}
-          Lighting:{" "}
-          <strong style={{ color: "var(--foreground)" }}>
-            {lightedCount}/{totalRunways} lighted
-          </strong>
-          {" "} (dataset).
-        </>
-      ) : (
-        <>No runway data available in dataset.</>
-      )}
-    </p>
-
-    {/* Primary frequency sentence */}
-    <p style={{ margin: 0, color: "var(--muted)", fontWeight: 500, lineHeight: 1.45 }}>
-      <strong style={{ color: "var(--foreground)" }}>Primary frequency:</strong>{" "}
-      {primaryFreq ? (
-        <>
-          <strong style={{ color: "var(--foreground)" }}>
-            {String(primaryFreq.type ?? "").toUpperCase()} {fmtFreqMHz(primaryFreq.frequency_mhz)}
-          </strong>
-          {primaryFreq.description ? <> ({primaryFreq.description})</> : null}.
-        </>
-      ) : (
-        <>No comm frequency in dataset.</>
-      )}
-      {" "}Use for MSFS planning only — not for real-world navigation.
-    </p>
-
-    {/* Optional navaid line */}
-    <p style={{ margin: 0, color: "var(--muted)", fontWeight: 500, lineHeight: 1.45 }}>
-      <strong style={{ color: "var(--foreground)" }}>Navaids:</strong>{" "}
-      {navaids.length > 0 ? (
-        <>
-          {Math.min(navaids.length, 5)} shown below (VOR/NDB/DME where available). If an ILS/LOC is missing,
-          the dataset may not include it for this airport.
-        </>
-      ) : (
-        <>No navaids listed for this airport in dataset.</>
-      )}
-    </p>
-  </div>
-
-  {/* Mini keyword footer (helps indexing, looks neutral) */}
-  <div style={{ marginTop: 10, color: "var(--muted)", fontSize: 13, fontWeight: 500 }}>
-    Keywords: {airport.ident}
-    {airport.iata_code ? ` ${airport.iata_code}` : ""} runway lights, tower frequency, ground, atis, approach,
-    MSFS 2020, MSFS 2024.
-  </div>
-</section>
 
         {/* Airport Info */}
         <Card title="Airport Info" subtitle="Name, codes, location, coordinates, elevation.">
@@ -955,25 +717,8 @@ const jsonLd = {
           <KV k="Codes" v={`${airport.iata_code ?? "—"} / ${airport.ident}`} />
           <KV k="Type" v={airport.type ?? "—"} />
           <KV k="City" v={airport.municipality ?? "—"} />
-<KV
-  k="Country"
-  v={
-    airport.iso_country
-      ? `${airport.iso_country}${countryName ? ` — ${countryName}` : ""}`
-      : "—"
-  }
-/>
-
-<KV
-  k="Region"
-  v={
-    airport.iso_region
-      ? `${airport.iso_region}${regionName ? ` — ${regionName}` : ""}`
-      : "—"
-  }
-/>
-
-
+          <KV k="Country" v={airport.iso_country ?? "—"} />
+          <KV k="Region" v={airport.iso_region ?? "—"} />
           <KV k="Continent" v={airport.continent ?? "—"} />
 
           <KV
@@ -990,7 +735,7 @@ const jsonLd = {
           />
           <KV k="Elevation" v={fmtFt(airport.elevation_ft)} />
           <KV k="Scheduled Service" v={airport.scheduled_service ?? "—"} />
-          {showGps && <KV k="GPS / Local ident" v={airport.gps_code ?? "—"} />}
+          {showGps && <KV k="GPS ident" v={airport.gps_code ?? "—"} />}
           <KV k="Local Code" v={airport.local_code ?? "—"} />
 
           {(isNonEmpty(airport.wikipedia_link) || isNonEmpty(airport.home_link)) && (
@@ -1048,9 +793,7 @@ const jsonLd = {
                 fontWeight: 500,
               }}
             >
-              <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>
-                Keywords:
-              </strong>{" "}
+              <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>Keywords:</strong>{" "}
               {airport.keywords}
             </div>
           )}
@@ -1059,9 +802,7 @@ const jsonLd = {
         {/* Runways */}
         <Card title="Runways" subtitle="Runway list (length, surface, heading, lights).">
           {runways.length === 0 ? (
-            <p style={{ margin: 0, color: "var(--muted)", fontWeight: 500 }}>
-              No runway records found.
-            </p>
+            <p style={{ margin: 0, color: "var(--muted)", fontWeight: 500 }}>No runway records found.</p>
           ) : (
             <div style={{ display: "grid", gap: 10, minWidth: 0 }}>
               {runways.map((r: any) => {
@@ -1111,11 +852,7 @@ const jsonLd = {
                         }}
                       >
                         {closed ? <Badge text="CLOSED" tone="warn" /> : null}
-                        {lighted ? (
-                          <Badge text="LIGHTED" tone="ok" />
-                        ) : (
-                          <Badge text="UNLIT (dataset)" tone="muted" />
-                        )}
+                        {lighted ? <Badge text="LIGHTED" tone="ok" /> : <Badge text="UNLIT" tone="muted" />}
                       </div>
                     </div>
 
@@ -1129,15 +866,13 @@ const jsonLd = {
                         wordBreak: "break-word",
                       }}
                     >
-{r.length_ft ? `${r.length_ft} ft / ${fmtMFromFt(r.length_ft)} long` : "— long"}
-{" · "}
-{r.width_ft ? `${r.width_ft} ft / ${fmtMFromFt(r.width_ft)} wide` : "— wide"}
-{" · "}
-{surfaceLabel(r.surface)}
-{" · "}
-HDG {r.le_heading_degt ?? "—"}° / {r.he_heading_degt ?? "—"}°
-
-
+                      {r.length_ft ? `${r.length_ft} ft / ${fmtMFromFt(r.length_ft)} long` : "— long"}
+                      {" · "}
+                      {r.width_ft ? `${r.width_ft} ft / ${fmtMFromFt(r.width_ft)} wide` : "— wide"}
+                      {" · "}
+                      {surfaceLabel(r.surface)}
+                      {" · "}
+                      HDG {r.le_heading_degt ?? "—"}° / {r.he_heading_degt ?? "—"}°
                     </div>
                   </div>
                 );
@@ -1149,9 +884,7 @@ HDG {r.le_heading_degt ?? "—"}° / {r.he_heading_degt ?? "—"}°
         {/* Frequencies */}
         <Card title="Frequencies" subtitle="TWR, GND, ATIS, APP, etc.">
           {frequencies.length === 0 ? (
-            <p style={{ margin: 0, color: "var(--muted)", fontWeight: 500 }}>
-              No frequency records found.
-            </p>
+            <p style={{ margin: 0, color: "var(--muted)", fontWeight: 500 }}>No frequency records found.</p>
           ) : (
             <div style={{ display: "grid", gap: 10, minWidth: 0 }}>
               {frequencies.map((f: any) => (
@@ -1215,13 +948,10 @@ HDG {r.le_heading_degt ?? "—"}° / {r.he_heading_degt ?? "—"}°
             <div style={{ display: "grid", gap: 10, minWidth: 0 }}>
               {navaids.map((n: any) => {
                 const hasPos =
-                  Number.isFinite(Number(n.latitude_deg)) &&
-                  Number.isFinite(Number(n.longitude_deg));
+                  Number.isFinite(Number(n.latitude_deg)) && Number.isFinite(Number(n.longitude_deg));
 
                 const maps = hasPos
-                  ? `https://www.google.com/maps?q=${Number(n.latitude_deg)},${Number(
-                      n.longitude_deg
-                    )}`
+                  ? `https://www.google.com/maps?q=${Number(n.latitude_deg)},${Number(n.longitude_deg)}`
                   : null;
 
                 return (
@@ -1280,9 +1010,7 @@ HDG {r.le_heading_degt ?? "—"}° / {r.he_heading_degt ?? "—"}°
                           wordBreak: "break-word",
                         }}
                       >
-                        <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>
-                          DME:
-                        </strong>{" "}
+                        <strong style={{ color: "var(--foreground)", fontWeight: 700 }}>DME:</strong>{" "}
                         {n.dme_channel ? `CH ${n.dme_channel}` : ""}
                         {n.dme_channel && n.dme_frequency_khz ? " · " : ""}
                         {n.dme_frequency_khz ? `${Math.round(Number(n.dme_frequency_khz))} kHz` : ""}
