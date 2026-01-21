@@ -50,31 +50,59 @@ function codeFromOriginalUri(originalUri: string | null) {
 export async function generateMetadata({
   params,
 }: {
-  params: { code: string };
+  params: { code?: string };
 }): Promise<Metadata> {
-  const ident = params.code.trim().toUpperCase();
+  // 1) Robust: niemals trim() auf undefined
+  let q = norm(params?.code);
 
+  // 2) Fallback wie in der Page: x-original-uri (hilft bei bestimmten Requests/Bots)
+  if (!q) {
+    const h = await headers();
+    q = codeFromOriginalUri(h.get("x-original-uri"));
+  }
+
+  // 3) Wenn wir immer noch nichts haben: harte, sichere Fallback-Metas
+  if (!q) {
+    const base = getBaseUrl();
+    return {
+      title: "Airport Lookup | MSFS",
+      description:
+        "Fast airport reference for Microsoft Flight Simulator (MSFS): runways, lights, frequencies.",
+      alternates: { canonical: `${base}/` },
+      robots: { index: false, follow: false },
+    };
+  }
+
+  // 4) Airport lookup: ICAO oder IATA
   const rows = await sql/* sql */`
     SELECT
       ident,
+      iata_code,
       name,
       municipality,
       iso_country
     FROM airports
-    WHERE ident = ${ident}
+    WHERE ident = ${q} OR iata_code = ${q}
     LIMIT 1
   `;
 
   const airport = rows?.[0];
 
+  // Canonical immer auf ICAO normalisieren, wenn vorhanden
+  const base = getBaseUrl();
+
   if (!airport) {
     return {
-      title: `${ident} Airport | MSFS`,
+      title: `${q} Airport | MSFS`,
+      description:
+        "Fast airport reference for Microsoft Flight Simulator (MSFS): runways, lights, frequencies.",
+      alternates: { canonical: `${base}/airports/${q}` },
       robots: { index: false, follow: false },
     };
   }
 
-  const airportName = String(airport.name ?? ident);
+  const icao = norm(airport.ident) || q;
+  const airportName = String(airport.name ?? icao);
   const city = airport.municipality ? String(airport.municipality) : "";
   const iso = airport.iso_country ? String(airport.iso_country) : "";
 
@@ -82,16 +110,17 @@ export async function generateMetadata({
 
   const placeBits = [city, countryName || iso].filter(Boolean).join(", ");
 
-  const title = `${ident} – ${airportName} | Frequencies, Runways & Lights (MSFS)`;
+  // Title: ICAO + Name + Intent + MSFS
+  const title = `${icao} – ${airportName} | Frequencies, Runways & Lights (MSFS)`;
 
   const description = [
-    `Runway lengths, runway lights and ATC frequencies for ${airportName} (${ident}${
+    `Runway lengths, runway lights and ATC frequencies for ${airportName} (${icao}${
       placeBits ? `, ${placeBits}` : ""
     }) in Microsoft Flight Simulator.`,
     `Fast reference — no addons. Not for real-world navigation.`,
   ].join(" ");
 
-  const canonicalUrl = `${getBaseUrl()}/airports/${ident}`;
+  const canonicalUrl = `${base}/airports/${icao}`;
 
   return {
     title,
@@ -107,6 +136,7 @@ export async function generateMetadata({
     twitter: { card: "summary", title, description },
   };
 }
+
 
 
 
