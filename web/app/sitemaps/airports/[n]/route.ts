@@ -14,13 +14,16 @@ export async function GET(
   const page = Math.max(0, parseInt(n, 10) || 0);
   const offset = page * PAGE_SIZE;
 
-  // Wir laden die ICAO-Codes für alle relevanten Typen
-  const rows = await sql/* sql */`
-    SELECT ident
-    FROM airports
-    WHERE type IN ('large_airport', 'medium_airport', 'small_airport')
-      AND ident IS NOT NULL
-    ORDER BY ident ASC
+  // Wir laden die ICAO-Codes und prüfen via LEFT JOIN auf ILS-Daten
+  // DISTINCT sorgt dafür, dass wir trotz mehrerer Runways pro Airport nur eine Zeile erhalten
+  const rows = await sql`
+    SELECT DISTINCT a.ident, 
+           CASE WHEN ri.airport_ident IS NOT NULL THEN 1 ELSE 0 END as has_ils
+    FROM airports a
+    LEFT JOIN runway_ils ri ON a.ident = ri.airport_ident
+    WHERE a.type IN ('large_airport', 'medium_airport', 'small_airport')
+      AND a.ident IS NOT NULL
+    ORDER BY a.ident ASC
     LIMIT ${PAGE_SIZE}
     OFFSET ${offset}
   `;
@@ -33,8 +36,8 @@ export async function GET(
   <url>
     <loc>${SITE_URL}/airports/${r.ident}</loc>
     <lastmod>${now}</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
+    <changefreq>${r.has_ils === 1 ? 'weekly' : 'monthly'}</changefreq>
+    <priority>${r.has_ils === 1 ? '1.0' : '0.6'}</priority>
   </url>`
     )
     .join("");
