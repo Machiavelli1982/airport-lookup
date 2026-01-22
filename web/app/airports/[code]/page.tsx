@@ -179,13 +179,14 @@ export default async function AirportPage(props: Props) {
   const airport = airportRows?.[0];
   if (!airport) notFound();
 
-  // Daten-Lookups parallelisieren
-  const [runways, frequencies, navaids, countryName, regionName] = await Promise.all([
+  // Daten-Lookups parallelisieren (Inklusive der neuen runway_ils Tabelle)
+  const [runways, frequencies, navaids, countryName, regionName, ilsData] = await Promise.all([
     sql`SELECT * FROM runways WHERE airport_ref = ${airport.id} ORDER BY length_ft DESC NULLS LAST`,
     sql`SELECT * FROM frequencies WHERE airport_ref = ${airport.id} ORDER BY type ASC, frequency_mhz ASC`,
     sql`SELECT * FROM navaids WHERE associated_airport = ${airport.ident} ORDER BY type ASC, ident ASC`,
     lookupCountryName(airport.iso_country),
-    lookupRegionName(airport.iso_region)
+    lookupRegionName(airport.iso_region),
+    sql`SELECT * FROM runway_ils WHERE airport_ident = ${airport.ident}`
   ]);
 
   const mapsUrl = googleMapsLink(airport.latitude_deg, airport.longitude_deg);
@@ -273,25 +274,67 @@ export default async function AirportPage(props: Props) {
           )}
         </Card>
 
-        {/* Runways Detail */}
-        <Card title="Runways" subtitle="Runway list (length, surface, heading, lights).">
-          {runways.map((r: any) => (
-            <div key={r.id} style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 12, marginBottom: 10, background: "rgba(255,255,255,0.03)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                <span style={{ fontWeight: 800, fontSize: 18 }}>{r.le_ident} / {r.he_ident}</span>
-                <Badge text={asBool(r.lighted) ? "LIGHTED" : "UNLIT"} tone={asBool(r.lighted) ? "ok" : "muted"} />
+        {/* Runways Detail (Inklusive ILS Frequenzen) */}
+        <Card title="Runways & ILS Approach" subtitle="Technical landing data for MSFS planning.">
+          {runways.map((r: any) => {
+            // Finde passende ILS-Daten für diese Runway
+            const ils = ilsData?.find((i: any) => i.runway_ident === r.le_ident || i.runway_ident === r.he_ident);
+            
+            return (
+              <div key={r.id} style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 16, marginBottom: 12, background: "rgba(255,255,255,0.02)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, alignItems: "center" }}>
+                  <span style={{ fontWeight: 800, fontSize: 20 }}>RWY {r.le_ident} / {r.he_ident}</span>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {ils && <Badge text="ILS AVAILABLE" tone="ok" />}
+                    <Badge text={asBool(r.lighted) ? "LIGHTED" : "UNLIT"} tone={asBool(r.lighted) ? "ok" : "muted"} />
+                  </div>
+                </div>
+                
+                <div style={{ color: "var(--muted)", fontWeight: 600, fontSize: 14, lineHeight: "1.5" }}>
+                  {r.length_ft ? `${r.length_ft} ft / ${fmtMFromFt(r.length_ft)}` : "—"}
+                  {" · "}
+                  {r.width_ft ? `${r.width_ft} ft / ${fmtMFromFt(r.width_ft)} wide` : "— wide"}
+                  {" · "}
+                  {surfaceLabel(r.surface)}
+                  <br />
+                  Heading: {r.le_heading_degt ?? "—"}° / {r.he_heading_degt ?? "—"}°
+                </div>
+
+                {/* Anzeige der ILS-Daten, falls vorhanden */}
+                {ils && (
+                  <div style={{ 
+                    marginTop: 12, 
+                    padding: 12, 
+                    background: "rgba(34,197,94,0.05)", 
+                    borderRadius: 8, 
+                    border: "1px solid rgba(34,197,94,0.2)",
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+                    gap: 10
+                  }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", fontWeight: 700 }}>Frequency</div>
+                      <div style={{ fontWeight: 800, color: "var(--foreground)", fontFamily: "monospace", fontSize: 16 }}>
+                        {ils.ils_freq ? `${Number(ils.ils_freq).toFixed(2)} MHz` : "TBD"}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", fontWeight: 700 }}>Ident</div>
+                      <div style={{ fontWeight: 800, color: "var(--foreground)", fontFamily: "monospace", fontSize: 16 }}>
+                        {ils.ils_ident || "—"}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", fontWeight: 700 }}>Course</div>
+                      <div style={{ fontWeight: 800, color: "var(--foreground)", fontFamily: "monospace", fontSize: 16 }}>
+                        {ils.ils_course ? `${Number(ils.ils_course).toFixed(0)}°` : "—"}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-              <div style={{ color: "var(--muted)", fontWeight: 600, fontSize: 14 }}>
-                {r.length_ft ? `${r.length_ft} ft / ${fmtMFromFt(r.length_ft)}` : "—"}
-                {" · "}
-                {r.width_ft ? `${r.width_ft} ft / ${fmtMFromFt(r.width_ft)} wide` : "— wide"}
-                {" · "}
-                {surfaceLabel(r.surface)}
-                <br />
-                HDG {r.le_heading_degt ?? "—"}° / {r.he_heading_degt ?? "—"}°
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </Card>
 
         {/* Frequencies */}
@@ -322,7 +365,7 @@ export default async function AirportPage(props: Props) {
         </Card>
 
         <div style={{ padding: "10px 2px", color: "var(--muted)", fontSize: 14, fontWeight: 500 }}>
-          Data: OurAirports (Public Domain). No guarantee of accuracy.
+          Data: FAA NASR (ILS) & OurAirports (Public Domain). No guarantee of accuracy.
         </div>
       </div>
     </main>
