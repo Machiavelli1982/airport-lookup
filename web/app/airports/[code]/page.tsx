@@ -39,7 +39,7 @@ function googleMapsLink(lat: any, lon: any) {
   const la = Number(lat);
   const lo = Number(lon);
   if (!Number.isFinite(la) || !Number.isFinite(lo)) return null;
-  return `https://www.google.com/maps?q=${la},${lo}`;
+  return `https://www.google.com/maps/search/?api=1&query=${la},${lo}`;
 }
 
 function fmtFreqMHz(mhz: any) {
@@ -103,7 +103,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const baseFallback: Metadata = {
     metadataBase: new URL(SITE_URL),
-    title: `${code || "Airport"} — Airport Lookup (Runways, ILS Frequencies)`,
+    title: `${code || "Airport"} — Runways, ILS Frequencies & Frequencies`,
     description: `Technical data for ${code}: ILS frequencies, runway lengths, and navaids for MSFS 2020/2024.`,
     alternates: { canonical: `/airports/${code}` },
     robots: { index: true, follow: true },
@@ -116,7 +116,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const a = rows?.[0];
     if (!a?.ident) return baseFallback;
 
-    const title = `${a.ident}${a.iata_code ? ` / ${a.iata_code}` : ""} — ${a.name} ILS & Runways`;
+    const title = `${a.ident}${a.iata_code ? ` / ${a.iata_code}` : ""} — ${a.name} (ILS, Runways, Frequencies)`;
     
     return {
       ...baseFallback,
@@ -188,53 +188,42 @@ export default async function AirportPage(props: Props) {
   ]);
 
   const hasIls = ilsData && ilsData.length > 0;
-  const ilsSource = ilsData?.[0]?.source === 'FAA_CSV' ? 'FAA NASR' : 'Public Domain';
+  const ilsSource = ilsData?.[0]?.source || "FAA/Global Dataset";
   const ilsUpdated = ilsData?.[0]?.created_at ? new Date(ilsData[0].created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "Jan 2026";
 
   const mapsUrl = googleMapsLink(airport.latitude_deg, airport.longitude_deg);
   const primaryFreq = pickPrimaryFrequency(frequencies);
   const associatedTop = (navaids ?? []).slice(0, 3);
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Airport",
-    name: airport.name,
-    icaoCode: airport.ident,
-    geo: { "@type": "GeoCoordinates", latitude: airport.latitude_deg, longitude: airport.longitude_deg },
-    url: `${SITE_URL}/airports/${airport.ident}`,
-  };
-
   return (
     <main style={{ padding: 18, maxWidth: 720, margin: "0 auto", fontFamily: "system-ui" }}>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      
       <div style={{ marginBottom: 12 }}>
         <Link href="/" style={{ color: "var(--foreground)", textDecoration: "none", fontWeight: 600 }}>← Back</Link>
       </div>
 
       <h1 style={{ fontSize: 44, margin: "8px 0 2px", fontWeight: 800 }}>{airport.ident}</h1>
+      <p style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 700, background: "#f0f0f0", display: "inline-block", padding: "4px 10px", borderRadius: 6, color: "#333", textTransform: "uppercase" }}>
+        Reference only — not for real-world navigation.
+      </p>
       <p style={{ margin: 0, fontSize: 18, color: "var(--muted)", fontWeight: 500 }}>{airport.name}</p>
 
       <div style={{ height: 24 }} />
 
       <div style={{ display: "grid", gap: 14 }}>
         
-        {/* Key Facts Card */}
-        <Card title="Key Facts" subtitle="Essential sim reference (runway, elevation, ILS status).">
+        {/* Key Facts mit ILS Status */}
+        <Card title="Key Facts" subtitle="Sim planning summary.">
           <div style={{ display: "grid", gap: 12 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: hasIls ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.03)", borderRadius: 12, border: "1px solid var(--border)" }}>
-              <span style={{ fontWeight: 700, fontSize: 14 }}>Precision Approach (ILS)</span>
-              <Badge 
-                text={hasIls ? "ILS AVAILABLE ✅" : "VFR / VISUAL ONLY"} 
-                tone={hasIls ? "ok" : "muted"} 
-              />
+              <span style={{ fontWeight: 700, fontSize: 14 }}>ILS Precision Approach</span>
+              <Badge text={hasIls ? "ILS AVAILABLE ✅" : "VFR / VISUAL ONLY"} tone={hasIls ? "ok" : "muted"} />
             </div>
 
             <KV k="Field Elevation" v={`${fmtFt(airport.elevation_ft)} / ${fmtMFromFt(airport.elevation_ft)}`} />
-            <KV k="Primary Contact" v={primaryFreq ? `${primaryFreq.type} ${fmtFreqMHz(primaryFreq.frequency_mhz)}` : "—"} />
+            <KV k="Primary Channel" v={primaryFreq ? `${primaryFreq.type} ${fmtFreqMHz(primaryFreq.frequency_mhz)}` : "—"} />
             
             <div style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 12, background: "rgba(255,255,255,0.02)" }}>
-              <div style={{ fontWeight: 700, color: "var(--muted)", marginBottom: 8, fontSize: 13, textTransform: "uppercase" }}>Runway Summary</div>
+              <div style={{ fontWeight: 700, color: "var(--muted)", marginBottom: 8, fontSize: 12, textTransform: "uppercase" }}>Runway Summary</div>
               {runways.map((r: any) => (
                 <div key={r.id} style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 14 }}>
                   <span style={{ fontWeight: 700 }}>{r.le_ident}/{r.he_ident} · {r.length_ft} ft</span>
@@ -242,33 +231,56 @@ export default async function AirportPage(props: Props) {
                 </div>
               ))}
             </div>
+
+            <div style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 12, background: "rgba(255,255,255,0.02)" }}>
+              <div style={{ fontWeight: 700, color: "var(--muted)", marginBottom: 8, fontSize: 12, textTransform: "uppercase" }}>Associated Navaids</div>
+              {associatedTop.map((n: any) => (
+                <div key={n.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 14, fontWeight: 600, marginBottom: 4 }}>
+                  <span>{n.ident} · {n.type}</span>
+                  <span>{fmtNavaidFreq(n.frequency_khz)}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </Card>
 
         {/* Airport Info */}
-        <Card title="Airport Info" subtitle="Location, coordinates, and codes.">
+        <Card title="Airport Info" subtitle="Location and meta data.">
           <KV k="Name" v={airport.name} />
           <KV k="Codes" v={`${airport.iata_code || "—"} / ${airport.ident}`} />
           <KV k="Type" v={airport.type} />
           <KV k="City" v={airport.municipality} />
           <KV k="Country" v={airport.iso_country ? `${airport.iso_country}${countryName ? ` — ${countryName}` : ""}` : "—"} />
+          <KV k="Region" v={airport.iso_region ? `${airport.iso_region}${regionName ? ` — ${regionName}` : ""}` : "—"} />
           <KV k="Coordinates" v={mapsUrl ? <a href={mapsUrl} target="_blank" style={{ color: "inherit", fontWeight: 700 }}>{fmtCoord(airport.latitude_deg)}, {fmtCoord(airport.longitude_deg)}</a> : "—"} />
           <KV k="Elevation" v={fmtFt(airport.elevation_ft)} />
+          {isNonEmpty(airport.wikipedia_link) && <KV k="Wikipedia" v={<a href={airport.wikipedia_link} target="_blank" style={{ color: "inherit" }}>Open Article</a>} />}
+          {isNonEmpty(airport.home_link) && <KV k="Website" v={<a href={airport.home_link} target="_blank" style={{ color: "inherit" }}>Visit Site</a>} />}
+          {isNonEmpty(airport.keywords) && (
+            <div style={{ marginTop: 12, padding: 12, background: "rgba(0,0,0,0.03)", borderRadius: 8, fontSize: 13 }}>
+              <strong>Keywords:</strong> {airport.keywords}
+            </div>
+          )}
         </Card>
 
         {/* Runways & ILS Detail */}
-        <Card title="Runways & Approach" subtitle="Technical ILS frequencies and runway headings.">
+        <Card title="Runways & Approach" subtitle="Technical data for landings.">
           {runways.map((r: any) => {
             const ils = ilsData?.find((i: any) => i.runway_ident === r.le_ident || i.runway_ident === r.he_ident);
             return (
               <div key={r.id} style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 16, marginBottom: 12, background: "rgba(255,255,255,0.01)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, alignItems: "center" }}>
                   <span style={{ fontWeight: 800, fontSize: 20 }}>RWY {r.le_ident} / {r.he_ident}</span>
-                  <Badge text={asBool(r.lighted) ? "LIGHTED" : "UNLIT"} tone={asBool(r.lighted) ? "ok" : "muted"} />
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {ils && <Badge text="ILS AVAILABLE" tone="ok" />}
+                    <Badge text={asBool(r.lighted) ? "LIGHTED" : "UNLIT"} tone={asBool(r.lighted) ? "ok" : "muted"} />
+                  </div>
                 </div>
                 
                 <div style={{ color: "var(--muted)", fontWeight: 600, fontSize: 14 }}>
                   {r.length_ft ? `${r.length_ft} ft / ${fmtMFromFt(r.length_ft)}` : "—"}
+                  {" · "}
+                  {r.width_ft ? `${r.width_ft} ft wide` : ""}
                   {" · "}
                   {surfaceLabel(r.surface)}
                   <br />
@@ -298,8 +310,8 @@ export default async function AirportPage(props: Props) {
           })}
         </Card>
 
-        {/* Frequencies & Navaids */}
-        <Card title="Frequencies" subtitle="Comm channels.">
+        {/* Frequencies */}
+        <Card title="Frequencies" subtitle="Communication channels.">
           {frequencies.map((f: any) => (
             <div key={f.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
               <div style={{ fontWeight: 700 }}>{f.type} <span style={{ color: "var(--muted)", fontWeight: 500, marginLeft: 8 }}>{f.description}</span></div>
@@ -308,14 +320,27 @@ export default async function AirportPage(props: Props) {
           ))}
         </Card>
 
-        {/* Data Verification Footer */}
+        {/* Navaids */}
+        <Card title="Navaids Detail" subtitle="VOR, NDB, and DME stations.">
+          {navaids.map((n: any) => (
+            <div key={n.id} style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 12, marginBottom: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800 }}>
+                <span>{n.ident} · {n.type}</span>
+                <span>{fmtNavaidFreq(n.frequency_khz)}</span>
+              </div>
+              <div style={{ color: "var(--muted)", fontSize: 14, marginTop: 4, fontWeight: 600 }}>
+                {n.name} <br />
+                {fmtCoord(n.latitude_deg)}, {fmtCoord(n.longitude_deg)} · {fmtFt(n.elevation_ft)}
+              </div>
+            </div>
+          ))}
+        </Card>
+
+        {/* Footer */}
         <div style={{ padding: "20px 10px", textAlign: "center", opacity: 0.6 }}>
           <p style={{ fontSize: 12, margin: 0 }}>
             Source: <strong style={{color: "var(--foreground)"}}>{ilsSource}</strong> · 
             Cycle: <strong style={{color: "var(--foreground)"}}>{ilsUpdated}</strong>
-          </p>
-          <p style={{ fontSize: 11, marginTop: 4 }}>
-            Provided for flight simulation use. Not for real-world navigation.
           </p>
         </div>
       </div>
