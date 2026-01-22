@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.env*
+node_modules/
+scripts/nav.csv
+
+echo "web/data/*.zip" >> .gitignoredata/28DaySubscription_Effective_2025-12-25.zip
+data/*.zip
