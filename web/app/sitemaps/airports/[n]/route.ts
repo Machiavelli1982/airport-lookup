@@ -1,5 +1,4 @@
 // web/app/sitemaps/airports/[n]/route.ts
-
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
@@ -16,27 +15,21 @@ export async function GET(
   const page = Math.max(0, parseInt(n, 10) || 0);
   const offset = page * PAGE_SIZE;
 
-  // STRATEGIE: Wir sortieren nach Wichtigkeit (Typ + ILS), nicht nach Alphabet.
   const rows = await sql`
     SELECT a.ident, 
-           MAX(CASE WHEN ri.airport_ident IS NOT NULL THEN 1 ELSE 0 END) as has_ils,
-           a.type
+           MAX(CASE WHEN ri.airport_ident IS NOT NULL THEN 1 ELSE 0 END) as has_ils
     FROM airports a
     LEFT JOIN runway_ils ri ON a.ident = ri.airport_ident
     WHERE a.type IN ('large_airport', 'medium_airport', 'small_airport')
       AND a.ident IS NOT NULL
     GROUP BY a.ident, a.type
     ORDER BY 
-      -- 1. Flughäfen mit ILS zuerst (Priorität 1.0 Content)
-      (CASE WHEN MAX(ri.airport_ident) IS NOT NULL THEN 1 ELSE 0 END) DESC,
-      -- 2. Große vor mittleren vor kleinen
+      has_ils DESC, 
       CASE a.type 
         WHEN 'large_airport' THEN 1 
         WHEN 'medium_airport' THEN 2 
         WHEN 'small_airport' THEN 3 
-        ELSE 4 
       END ASC,
-      -- 3. Erst am Ende alphabetisch
       a.ident ASC
     LIMIT ${PAGE_SIZE}
     OFFSET ${offset}
@@ -44,17 +37,13 @@ export async function GET(
 
   const now = new Date().toISOString().split("T")[0];
 
-  const urls = rows
-    .map(
-      (r: any) => `
+  const urls = rows.map((r: any) => `
   <url>
     <loc>${SITE_URL}/airports/${r.ident}</loc>
     <lastmod>${now}</lastmod>
     <changefreq>${r.has_ils === 1 ? 'weekly' : 'monthly'}</changefreq>
     <priority>${r.has_ils === 1 ? '1.0' : '0.6'}</priority>
-  </url>`
-    )
-    .join("");
+  </url>`).join("");
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -64,7 +53,7 @@ ${urls}
   return new NextResponse(xml, {
     headers: { 
       "Content-Type": "application/xml; charset=utf-8",
-      "Cache-Control": "s-maxage=86400, stale-while-revalidate"
+      "Cache-Control": "s-maxage=86400, stale-while-revalidate" 
     },
   });
 }
