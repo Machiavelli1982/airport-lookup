@@ -78,6 +78,7 @@ function norm(code: string | undefined | null): string {
 function numFmt(n: number | string | null | undefined): string {
   const x = Number(n);
   if (!Number.isFinite(x)) return "—";
+  // Verwendet Regex für Tausendertrennung statt toLocaleString (vermeidet Hydration-Errors)
   return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
@@ -196,15 +197,17 @@ export default async function AirportPage({ params }: Props) {
   const airport = airportRows?.[0];
   if (!airport) notFound();
 
+  // WICHTIG: Tabellennamen müssen exakt mit deiner DB übereinstimmen
   const [runways, frequencies, navaids, countryName, regionName, ilsData] = await Promise.all([
     sql<Runway[]>`SELECT * FROM runways WHERE airport_ref = ${airport.id} ORDER BY length_ft DESC NULLS LAST`,
-    sql<Frequency[]>`SELECT * FROM airport_frequencies WHERE airport_ref = ${airport.id} ORDER BY type ASC, frequency_mhz ASC`,
+    sql<Frequency[]>`SELECT * FROM frequencies WHERE airport_ref = ${airport.id} ORDER BY type ASC, frequency_mhz ASC`,
     sql<Navaid[]>`SELECT * FROM navaids WHERE associated_airport = ${airport.ident} ORDER BY type ASC, ident ASC`,
     lookupCountryName(airport.iso_country),
     lookupRegionName(airport.iso_region),
     sql<RunwayIls[]>`SELECT * FROM runway_ils WHERE airport_ident = ${airport.ident}`
   ]);
 
+  // Nearby Airports Logik via Haversine SQL
   const nearby = await sql`
     SELECT ident, name, municipality,
     (2 * 6371 * asin(sqrt(power(sin(radians((${airport.latitude_deg} - latitude_deg) / 2)), 2) + cos(radians(latitude_deg)) * cos(radians(${airport.latitude_deg})) * power(sin(radians((${airport.longitude_deg} - longitude_deg) / 2)), 2)))) as dist
@@ -214,6 +217,7 @@ export default async function AirportPage({ params }: Props) {
   const hasIlsData = ilsData && ilsData.length > 0;
   const primaryFreq = pickPrimaryFrequency(frequencies);
   const associatedTop = navaids.slice(0, 3);
+  const ilsUpdated = ilsData?.[0]?.created_at ? new Date(ilsData[0].created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "Jan 2026";
 
   return (
     <main style={{ padding: 18, maxWidth: 720, margin: "0 auto", fontFamily: "system-ui" }}>
@@ -264,6 +268,7 @@ export default async function AirportPage({ params }: Props) {
           <KV k="GPS Coordinates" v={<a href={googleMapsLink(airport.latitude_deg, airport.longitude_deg)} target="_blank" style={{ color: "var(--foreground)", fontWeight: 700 }}>📍 {fmtCoord(airport.latitude_deg)}, {fmtCoord(airport.longitude_deg)} 🗺️</a>} />
           <KV k="Elevation" v={numFmt(airport.elevation_ft) + " ft"} />
           {airport.wikipedia_link && <KV k="Wikipedia" v={<a href={airport.wikipedia_link} target="_blank" style={{ color: "inherit" }}>Open Article</a>} />}
+          {airport.home_link && <KV k="Official Website" v={<a href={airport.home_link} target="_blank" style={{ color: "inherit" }}>Visit Site</a>} />}
         </Card>
 
         {/* Runways & ILSpage.tsx_230126.txt] */}
@@ -299,7 +304,7 @@ export default async function AirportPage({ params }: Props) {
           })}
         </Card>
 
-        {/* Nearby Airports */}
+        {/* Nearby Airports Section */}
         <Card title="Nearby Airports" subtitle="Alternative airports in the vicinity (km & nm).">
           <div style={{ display: "grid", gap: 8 }}>
             {nearby.map((nb: any) => (
@@ -311,28 +316,36 @@ export default async function AirportPage({ params }: Props) {
           </div>
         </Card>
 
-        {/* Frequenciespage.tsx_230126.txt] */}
+        {/* Communication Frequenciespage.tsx_230126.txt] */}
         <Card title="Communication Frequencies" subtitle="Air traffic control and advisory channels.">
-          {frequencies.map((f) => (
+          {frequencies.length > 0 ? frequencies.map((f) => (
             <div key={f.id} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid var(--border)" }}>
               <div style={{ fontWeight: 700 }}>{f.type} <span style={{ color: "var(--muted)", fontWeight: 500, marginLeft: 8 }}>{f.description}</span></div>
               <div style={{ fontWeight: 800, fontFamily: "monospace" }}>{f.frequency_mhz.toFixed(2)} MHz</div>
             </div>
-          ))}
+          )) : <p style={{ color: "var(--muted)" }}>No frequency data available.</p>}
         </Card>
 
-        {/* Navaidspage.tsx_230126.txt] */}
+        {/* Nearby Navaidspage.tsx_230126.txt] */}
         <Card title="Nearby Navaids" subtitle="Ground-based navigation aids (VOR, NDB, DME).">
-          {associatedTop.map((n) => (
+          {associatedTop.length > 0 ? associatedTop.map((n) => (
             <div key={n.id} style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 14, marginBottom: 10, background: "rgba(255,255,255,0.01)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, marginBottom: 4 }}>
                 <span style={{ fontSize: 16 }}>{n.ident} · {n.type} ({n.name})</span>
-                <span style={{ color: "var(--foreground)" }}>{n.frequency_khz} kHz</span>
+                <span style={{ color: "var(--foreground)" }}>{numFmt(n.frequency_khz)} kHz</span>
               </div>
               <div style={{ color: "var(--muted)", fontSize: 14, fontWeight: 600 }}>{fmtCoord(n.latitude_deg)}, {fmtCoord(n.longitude_deg)} · {numFmt(n.elevation_ft)} ft</div>
             </div>
-          ))}
+          )) : <p style={{ color: "var(--muted)" }}>No navaids found in vicinity.</p>}
         </Card>
+
+        {/* Footer */}
+        <div style={{ padding: "30px 10px", textAlign: "center", borderTop: "1px solid var(--border)", marginTop: 20 }}>
+          <p style={{ fontSize: 12, color: "var(--muted)", margin: 0 }}>
+            Base Airport Data: OurAirports (Public Domain) <br />
+            Instrument Approach Data: Mixed / Manual · Cycle: {ilsUpdated}
+          </p>
+        </div>
       </div>
     </main>
   );
