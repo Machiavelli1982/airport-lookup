@@ -11,26 +11,21 @@ const SITE_URL = "https://www.airportlookup.com";
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Airport Lookup for MSFS (Runways, Lights, Frequencies, Navaids)",
+    default: "MSFS Airport Lookup — ILS Frequencies, Runways & Navaids",
     template: "%s · Airport Lookup",
   },
   description:
-    "Fast airport reference for Microsoft Flight Simulator (MSFS 2020/2024): runway data incl. lighting, tower/ground/ATIS frequencies, and navaids. Reference only — not for real-world navigation.",
+    "The fastest technical reference for MSFS 2020/2024. Global database for ILS frequencies, runway lighting, ATIS/TWR comms, and Navaids for flight planning.",
   alternates: {
     canonical: "/",
   },
   openGraph: {
     type: "website",
     url: "/",
-    title: "Airport Lookup for MSFS (Runways, Lights, Frequencies, Navaids)",
+    title: "MSFS Airport Lookup — ILS Frequencies & Technical Runway Data",
     description:
-      "Search airports by ICAO/IATA and view runway lighting, frequencies (TWR/GND/ATIS/APP), and navaids for MSFS 2020 & 2024.",
+      "Global airport database for flight simulator pilots. Verified ILS approaches, runway lighting badges, and radio frequencies.",
     siteName: "Airport Lookup",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Airport Lookup for MSFS (Runways, Lights, Frequencies, Navaids)",
-    description: "Fast reference for MSFS runway lighting, frequencies, and navaids.",
   },
   robots: {
     index: true,
@@ -38,16 +33,15 @@ export const metadata: Metadata = {
   },
 };
 
-// Strategisch wichtige Hubs für SEO
 const EXAMPLES = [
   { code: "KJFK", label: "New York (KJFK)" },
   { code: "EGLL", label: "London (EGLL)" },
   { code: "EDDF", label: "Frankfurt (EDDF)" },
-  { code: "OMDB", label: "Dubai (OMDB)" },
-  { code: "RJTT", label: "Tokyo (RJTT)" },
-  { code: "LOWW", label: "Vienna (LOWW)" },
+  { code: "EHAM", label: "Amsterdam (EHAM)" },
   { code: "KLAX", label: "Los Angeles (KLAX)" },
   { code: "LSZH", label: "Zürich (LSZH)" },
+  { code: "LOWW", label: "Vienna (LOWW)" },
+  { code: "OMDB", label: "Dubai (OMDB)" },
 ];
 
 export default function Home() {
@@ -70,36 +64,31 @@ export default function Home() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      {/* Hero Section */}
+      {/* Hero Section - SEO Fokus: Sim-Relevanz */}
       <section className="mb-8">
         <h1 className="text-4xl font-extrabold tracking-tight text-neutral-900 dark:text-neutral-100">
-          MSFS Airport Lookup
+          Global MSFS Airport Database
         </h1>
         <p className="mt-3 text-lg text-neutral-700 dark:text-neutral-300">
-          The essential <strong>flight simulator reference</strong> for pilots. Get instant access to 
-          runway data, lighting systems, and radio frequencies for over 5,000 airports worldwide. 
-          Optimized for <strong>MSFS 2020 & 2024</strong>.
-        </p>
-
-        <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
-          Search over 5,000 airports: runway lights, lengths, ATIS/TWR/GND frequencies, VOR/NDB/DME.
+          The essential <strong>flight simulator reference</strong>. Get instant access to 
+          <strong> ILS frequencies</strong>, runway lighting, and Navaids for over 40,000 airports. 
+          Built for <strong>MSFS 2020, MSFS 2024</strong>, and advanced aircraft like PMDG and Fenix.
         </p>
       </section>
 
-      {/* Search & Examples Card */}
+      {/* Search Section */}
       <section className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 shadow-sm">
         <AirportSearch />
         
         <p className="mt-4 text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
-          Airport Lookup is a specialized MSFS reference tool. We provide instant access to 
-          <strong> runway lighting badges</strong>, runway headings, and essential comms (TWR/GND/APP). 
-          Search by ICAO or IATA to access canonical data pages for large, medium, and small airports.
+          Search by ICAO or IATA. We provide <strong>verified ILS approach data</strong>, 
+          runway headings (mag/true), and technical communication frequencies (TWR, GND, DEP, APP).
         </p>
 
-        {/* Global Examples */}
+        {/* Global Hubs */}
         <div className="mt-8">
           <div className="mb-3 text-xs font-bold uppercase tracking-widest text-neutral-500">
-            Global Hubs & Popular Searches
+            Strategic Virtual Hubs
           </div>
           <div className="flex flex-wrap gap-2">
             {EXAMPLES.map((x) => (
@@ -115,63 +104,63 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Dynamic Nearby Feature (UX & Engagement) */}
       <NearbyAirports />
 
-      {/* SEO Text Block - NEU für Google Ranking */}
+      {/* SEO Content Section - Maximierung der Relevanz */}
       <section className="mt-16 border-l-4 border-blue-500 pl-6 py-2">
-          <h2 className="text-2xl font-bold mb-4">Everything for your MSFS Flight Plan</h2>
+          <h2 className="text-2xl font-bold mb-4">Optimized for SimBrief & VATSIM Pilots</h2>
           <p className="text-neutral-600 dark:text-neutral-400 leading-relaxed max-w-3xl">
-            Whether you are flying a heavy jet into <strong>London Heathrow (EGLL)</strong> or a small bush plane 
-            into a remote <strong>small airfield</strong>, our database provides the critical info you need for a 
-            successful landing. We focus on <strong>runway lighting</strong>, approach frequencies, and 
-            Navaids (VOR/NDB) to help you navigate the virtual skies without opening complex charts. 
-            Perfect for <strong>Xbox simmers</strong> who need fast data on a second screen.
+            Planning a flight in <strong>SimBrief</strong> or flying online with <strong>VATSIM/IVAO</strong>? 
+            Airport Lookup provides the technical "last mile" data. While charts are essential, our tool gives 
+            you the <strong>ILS ident</strong>, localizer course, and <strong>runway lighting status</strong> (PAPI, VASI, REIL) 
+            at a glance. Perfect for <strong>Xbox simmers</strong> and VR pilots who need a fast second-screen reference 
+            for technical landing data.
           </p>
       </section>
 
-      {/* Feature Value Props */}
+      {/* Value Props */}
       <section className="mt-12 grid gap-6 md:grid-cols-3">
         <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6">
-          <h3 className="font-bold text-neutral-900 dark:text-white">Runway Data</h3>
+          <h3 className="font-bold text-neutral-900 dark:text-white">Verified ILS Data</h3>
           <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
-            Get accurate lengths, surfaces, and lighting status for safe landings in MSFS 2024.
+            Real-world localizer frequencies and courses for instrument landings in zero visibility.
           </p>
         </div>
 
         <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6">
-          <h3 className="font-bold text-neutral-900 dark:text-white">Radio Comms</h3>
+          <h3 className="font-bold text-neutral-900 dark:text-white">Runway Lighting</h3>
           <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
-            Quickly find TWR, GND, and ATIS frequencies without digging through complex charts.
+            Detailed lighting info (Centerline, Touchdown, Edge) to identify runways at night.
           </p>
         </div>
 
         <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6">
-          <h3 className="font-bold text-neutral-900 dark:text-white">Navaids</h3>
+          <h3 className="font-bold text-neutral-900 dark:text-white">Navaids & Comms</h3>
           <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
-            Full coverage of VOR, NDB, and DME stations with frequencies and coordinates.
+            Complete frequency list for VOR, NDB, and ATC (ATIS, Delivery, Ground, Tower).
           </p>
         </div>
       </section>
 
-      {/* Transparency & Disclaimer */}
+      {/* Transparency - Korrigiert auf "Inklusive ILS" */}
       <section className="mt-8 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-100/50 dark:bg-neutral-900/50 p-6">
         <h3 className="text-sm font-bold text-neutral-900 dark:text-white uppercase tracking-wider">
-          Data & Accuracy
+          Data Integrity
         </h3>
         <p className="mt-2 text-sm text-neutral-700 dark:text-neutral-300">
-          ILS data is excluded to maintain reliability. For official flight procedures and real-world 
-          navigation, always use current AIP charts. Data is sourced from public domain datasets like OurAirports.
+          Our technical database combines <strong>OurAirports</strong> public data with 
+          <strong> FAA NASR</strong> instrument approach records. Updated for the latest MSFS 
+          navigation cycles. Reference only — not for real-world aviation.
         </p>
       </section>
 
-      {/* SEO Internal Link Footer */}
+      {/* Internal Links Footer */}
       <section className="mt-12 pt-8 border-t border-neutral-200 dark:border-neutral-800">
-        <div className="text-xs font-bold text-neutral-500 uppercase mb-4">Quick Airport Links (MSFS Frequencies)</div>
+        <div className="text-xs font-bold text-neutral-500 uppercase mb-4">Technical Runway & ILS References</div>
         <div className="flex flex-wrap gap-x-6 gap-y-3 text-xs">
           {EXAMPLES.map((x) => (
             <Link key={x.code} href={`/airports/${x.code}`} className="text-neutral-600 dark:text-neutral-400 hover:text-blue-600 underline underline-offset-4">
-              {x.code} Runway Lights & Comms
+              {x.code} ILS Frequencies & Lighting
             </Link>
           ))}
         </div>
