@@ -137,7 +137,7 @@ function pickPrimaryFrequency(frequencies: Frequency[]) {
 
 const asBool = (v: any) => v === true || v === 1 || v === "1" || v === "t";
 
-/* ----------------------------- SEO ----------------------------- */
+/* ----------------------------- SEO & METADATA ----------------------------- */
 
 type Props = { params: Promise<{ code: string }> };
 
@@ -219,10 +219,23 @@ export default async function AirportPage({ params }: Props) {
   const hasIlsData = ilsData && ilsData.length > 0;
   const primaryFreq = pickPrimaryFrequency(frequencies);
   const associatedTop = navaids.slice(0, 3);
+  const ilsSource = ilsData?.[0]?.source === 'FAA_CSV' ? 'FAA NASR' : 'Mixed / Manual';
   const ilsUpdated = ilsData?.[0]?.created_at ? new Date(ilsData[0].created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "Jan 2026";
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Airport",
+    name: airport.name,
+    icaoCode: airport.ident,
+    iataCode: airport.iata_code,
+    geo: { "@type": "GeoCoordinates", latitude: airport.latitude_deg, longitude: airport.longitude_deg },
+    url: `${SITE_URL}/airports/${airport.ident}`,
+  };
 
   return (
     <main style={{ padding: 18, maxWidth: 720, margin: "0 auto", fontFamily: "system-ui" }}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      
       <div style={{ marginBottom: 12 }}>
         <Link href="/" style={{ color: "var(--foreground)", textDecoration: "none", fontWeight: 600 }}>← Back to Search</Link>
       </div>
@@ -280,6 +293,7 @@ export default async function AirportPage({ params }: Props) {
           <KV k="GPS Coordinates" v={<a href={googleMapsLink(airport.latitude_deg, airport.longitude_deg)} target="_blank" style={{ color: "var(--foreground)", fontWeight: 700 }}>📍 {fmtCoord(airport.latitude_deg)}, {fmtCoord(airport.longitude_deg)} 🗺️</a>} />
           <KV k="Elevation" v={numFmt(airport.elevation_ft) + " ft"} />
           {airport.wikipedia_link && <KV k="Wikipedia" v={<a href={airport.wikipedia_link} target="_blank" style={{ color: "inherit" }}>Open Article</a>} />}
+          {airport.home_link && <KV k="Official Website" v={<a href={airport.home_link} target="_blank" style={{ color: "inherit" }}>Visit Site</a>} />}
         </Card>
 
         {/* Runways & ILS Approach Datapage.tsx_230126.txt] */}
@@ -317,17 +331,17 @@ export default async function AirportPage({ params }: Props) {
 
         {/* Communication Frequenciespage.tsx_230126.txt] */}
         <Card title="Communication Frequencies" subtitle="Air traffic control and advisory channels.">
-          {frequencies.map((f) => (
+          {frequencies.length > 0 ? frequencies.map((f) => (
             <div key={f.id} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid var(--border)" }}>
               <div style={{ fontWeight: 700 }}>{f.type} <span style={{ color: "var(--muted)", fontWeight: 500, marginLeft: 8 }}>{f.description}</span></div>
               <div style={{ fontWeight: 800, fontFamily: "monospace" }}>{f.frequency_mhz.toFixed(2)} MHz</div>
             </div>
-          ))}
+          )) : <p style={{ color: "var(--muted)" }}>No frequency data available.</p>}
         </Card>
 
         {/* Nearby Navaids with Coordinate Linkspage.tsx_230126.txt] */}
         <Card title="Nearby Navaids" subtitle="Ground-based navigation aids (VOR, NDB, DME).">
-          {navaids.map((n) => (
+          {navaids.length > 0 ? navaids.map((n) => (
             <div key={n.id} style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 14, marginBottom: 10, background: "rgba(255,255,255,0.01)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, marginBottom: 4 }}>
                 <span style={{ fontSize: 16 }}>{n.ident} · {n.type} ({n.name})</span>
@@ -339,10 +353,10 @@ export default async function AirportPage({ params }: Props) {
                 </a> · {numFmt(n.elevation_ft)} ft
               </div>
             </div>
-          ))}
+          )) : <p style={{ color: "var(--muted)" }}>No navaids found in vicinity.</p>}
         </Card>
 
-        {/* Nearby Airports - Moved to bottom as the last box */}
+        {/* Nearby Airports - Last box */}
         <Card title="Nearby Airports" subtitle="Alternative airports in the vicinity (km & nm).">
           <div style={{ display: "grid", gap: 8 }}>
             {nearby.map((nb: any) => (
@@ -354,12 +368,18 @@ export default async function AirportPage({ params }: Props) {
           </div>
         </Card>
 
-        {/* Footer */}
+        {/* Footer / Credits / Keywordspage.tsx_230126.txt] */}
         <div style={{ padding: "30px 10px", textAlign: "center", borderTop: "1px solid var(--border)", marginTop: 20 }}>
           <p style={{ fontSize: 12, color: "var(--muted)", margin: 0 }}>
-            Base Airport Data: OurAirports (Public Domain) <br />
-            Instrument Approach Data Cycle: {ilsUpdated}
+            Base Airport Data: <strong style={{color: "var(--foreground)"}}>OurAirports</strong> (Public Domain) <br />
+            Instrument Approach Data: <strong style={{color: "var(--foreground)"}}>{ilsSource}</strong> · 
+            Cycle: <strong style={{color: "var(--foreground)"}}>{ilsUpdated}</strong>
           </p>
+          {airport.keywords && (
+            <div style={{ marginTop: 15, fontSize: 11, color: "var(--muted)", maxWidth: "100%", overflowWrap: "break-word" }}>
+              <strong>MSFS Keywords:</strong> {airport.keywords}
+            </div>
+          )}
         </div>
       </div>
     </main>
