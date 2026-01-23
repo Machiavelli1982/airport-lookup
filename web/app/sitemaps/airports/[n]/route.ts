@@ -1,3 +1,5 @@
+// web/app/sitemaps/airports/[n]/route.ts
+
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
@@ -14,16 +16,28 @@ export async function GET(
   const page = Math.max(0, parseInt(n, 10) || 0);
   const offset = page * PAGE_SIZE;
 
-  // Wir laden die ICAO-Codes und prüfen via LEFT JOIN auf ILS-Daten
-  // DISTINCT sorgt dafür, dass wir trotz mehrerer Runways pro Airport nur eine Zeile erhalten
+  // STRATEGIE: Wir sortieren nach Wichtigkeit (Typ + ILS), nicht nach Alphabet.
   const rows = await sql`
-    SELECT DISTINCT a.ident, 
-           CASE WHEN ri.airport_ident IS NOT NULL THEN 1 ELSE 0 END as has_ils
+    SELECT a.ident, 
+           MAX(CASE WHEN ri.airport_ident IS NOT NULL THEN 1 ELSE 0 END) as has_ils,
+           a.type
     FROM airports a
     LEFT JOIN runway_ils ri ON a.ident = ri.airport_ident
     WHERE a.type IN ('large_airport', 'medium_airport', 'small_airport')
       AND a.ident IS NOT NULL
-    ORDER BY a.ident ASC
+    GROUP BY a.ident, a.type
+    ORDER BY 
+      -- 1. Flughäfen mit ILS zuerst (Priorität 1.0 Content)
+      (CASE WHEN MAX(ri.airport_ident) IS NOT NULL THEN 1 ELSE 0 END) DESC,
+      -- 2. Große vor mittleren vor kleinen
+      CASE a.type 
+        WHEN 'large_airport' THEN 1 
+        WHEN 'medium_airport' THEN 2 
+        WHEN 'small_airport' THEN 3 
+        ELSE 4 
+      END ASC,
+      -- 3. Erst am Ende alphabetisch
+      a.ident ASC
     LIMIT ${PAGE_SIZE}
     OFFSET ${offset}
   `;
