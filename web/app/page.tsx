@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import AirportSearch from "@/app/components/AirportSearch";
 import NearbyAirports from "@/app/components/NearbyAirports";
+import { sql } from "@/lib/db"; // Für den dynamischen Länder-Abruf
 
 export const runtime = "nodejs";
 
@@ -16,16 +17,11 @@ export const metadata: Metadata = {
   },
   description:
     "Fast technical reference for Microsoft Flight Simulator 2024 (PS5, Xbox, PC). Global runway data, verified US ILS frequencies (FAA), and radio comms.",
-  alternates: {
-    canonical: "/",
-  },
-  robots: {
-    index: true,
-    follow: true,
-  },
+  alternates: { canonical: "/" },
+  robots: { index: true, follow: true },
 };
 
-// Strategisch wichtige US-Hubs (da aktuell FAA-Daten verifiziert sind)
+// Verifizierte US-Hubs (FAA Daten) 
 const US_ILS_HUBS = [
   { code: "KJFK", label: "New York (KJFK)" },
   { code: "KLAX", label: "Los Angeles (KLAX)" },
@@ -37,7 +33,18 @@ const US_ILS_HUBS = [
   { code: "KDFW", label: "Dallas (KDFW)" },
 ];
 
-export default function Home() {
+export default async function Home() {
+  // Wir holen uns die Top-Länder mit den meisten Flughäfen für die SEO-Sektion
+  const topCountries = await sql`
+    SELECT c.code, c.name, COUNT(a.id) as count
+    FROM countries c
+    JOIN airports a ON c.code = a.iso_country
+    WHERE a.type IN ('large_airport', 'medium_airport')
+    GROUP BY c.code, c.name
+    ORDER BY count DESC
+    LIMIT 24
+  `;
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "WebSite",
@@ -57,7 +64,7 @@ export default function Home() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      {/* Hero Section */}
+      {/* Hero Section  */}
       <section className="mb-8">
         <h1 className="text-4xl font-extrabold tracking-tight text-neutral-900 dark:text-neutral-100">
           MSFS 2024 Airport Lookup
@@ -69,7 +76,7 @@ export default function Home() {
         </p>
       </section>
 
-      {/* Search & Strategic Hubs Card */}
+      {/* Search & Strategic Hubs Card  */}
       <section className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 shadow-sm">
         <AirportSearch />
         
@@ -79,7 +86,7 @@ export default function Home() {
           Search over 40,000 airports worldwide by ICAO or IATA code.
         </p>
 
-        {/* Strategic US Hubs (Verified Data) */}
+        {/* Global Hubs (Verified US Data)  */}
         <div className="mt-8">
           <div className="mb-3 text-xs font-bold uppercase tracking-widest text-neutral-500">
             Verified US ILS Hubs (FAA Data)
@@ -98,10 +105,10 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Dynamic Nearby Feature */}
+      {/* Dynamic Nearby Feature  */}
       <NearbyAirports />
 
-      {/* SEO Text Block - Fokus auf PS5 & SimBrief */}
+      {/* SEO Text Block - Fokus auf PS5 & SimBrief  */}
       <section className="mt-16 border-l-4 border-blue-500 pl-6 py-2">
           <h2 className="text-2xl font-bold mb-4">Master your MSFS 2024 Flight Plan on PS5 & Xbox</h2>
           <p className="text-neutral-600 dark:text-neutral-400 leading-relaxed max-w-3xl">
@@ -114,8 +121,25 @@ export default function Home() {
           </p>
       </section>
 
-      {/* Feature Value Props */}
-      <section className="mt-12 grid gap-6 md:grid-cols-3">
+      {/* NEU: Browse by Country Section [cite: 21] */}
+      <section className="mt-16">
+        <h2 className="text-2xl font-bold mb-6 text-neutral-900 dark:text-neutral-100">Browse Airports by Country</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          {topCountries.map((c: any) => (
+            <Link
+              key={c.code}
+              href={`/countries/${c.code}`}
+              className="group flex flex-col p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:border-blue-500 transition-all shadow-sm"
+            >
+              <span className="text-sm font-bold text-neutral-900 dark:text-neutral-100 group-hover:text-blue-500">{c.name}</span>
+              <span className="text-xs text-neutral-500 mt-1">{numFmt(c.count)} Hubs</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* Feature Value Props  */}
+      <section className="mt-16 grid gap-6 md:grid-cols-3">
         <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6">
           <h3 className="font-bold text-neutral-900 dark:text-white">Runway & ILS</h3>
           <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
@@ -138,20 +162,20 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Data Transparency & Disclaimer */}
+      {/* Data Transparency & Disclaimer  */}
       <section className="mt-8 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-100/50 dark:bg-neutral-900/50 p-6">
         <h3 className="text-sm font-bold text-neutral-900 dark:text-white uppercase tracking-wider">
           Data Sources & Accuracy
         </h3>
         <p className="mt-2 text-sm text-neutral-700 dark:text-neutral-300">
-          Airport metadata is sourced from <strong>OurAirports</strong> (Public Domain)page.tsx_230126.txt]. 
+          Airport metadata is sourced from <strong>OurAirports</strong> (Public Domain). 
           Instrument Approach Data (ILS) for the United States is provided by <strong>FAA NASR</strong> 
-          (National Airspace System Resources)page.tsx_230126.txt]. 
+          (National Airspace System Resources) . 
           Reference only — not for real-world navigation.
         </p>
       </section>
 
-      {/* SEO Internal Link Footer - Nur US-Links (Verified) */}
+      {/* SEO Internal Link Footer - Nur US-Links (Verified)  */}
       <section className="mt-12 pt-8 border-t border-neutral-200 dark:border-neutral-800">
         <div className="text-xs font-bold text-neutral-500 uppercase mb-4">Verified US Runway Lights & ILS Comms</div>
         <div className="flex flex-wrap gap-x-6 gap-y-3 text-xs">
@@ -164,4 +188,11 @@ export default function Home() {
       </section>
     </main>
   );
+}
+
+// Helper für Tausendertrenner (Hydration-Safe) 
+function numFmt(n: number | string | null | undefined): string {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return "0";
+  return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
