@@ -31,6 +31,12 @@ export async function GET(req: Request) {
       latitude_deg,
       longitude_deg,
 
+      -- ILS Check (SEO & User Engagement)
+      EXISTS (
+        SELECT 1 FROM runway_ils 
+        WHERE airport_ident = airports.ident
+      ) as has_ils,
+
       -- ranking helpers
       (iata_code IS NOT NULL) as has_iata,
       (ident ~ '^[A-Z]{4}$') as is_icao4,
@@ -67,7 +73,8 @@ export async function GET(req: Request) {
         ELSE 6
       END,
 
-      -- secondary: prefer real airports over local ids for city/name searches
+      -- secondary: prefer airports with ILS data for better SEO results
+      has_ils DESC,
       has_iata DESC,
       is_icao4 DESC,
       has_dash_ident ASC,
@@ -82,6 +89,7 @@ export async function GET(req: Request) {
   `;
 
   return NextResponse.json({
+    // has_ils wird hier NICHT herausgefiltert, damit es im Frontend ankommt
     items: items.map(({ has_iata, is_icao4, has_dash_ident, type_rank, ...rest }: any) => rest),
   });
 }
