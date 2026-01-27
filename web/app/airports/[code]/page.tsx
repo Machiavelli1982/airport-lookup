@@ -5,8 +5,8 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { sql } from "@/lib/db";
 import type { ReactNode } from "react";
-// Lucide Icons für die neuen Ergänzungen
-import { Plane, Helicopter, Globe, ChevronLeft, ShieldCheck, MapPin, Database } from "lucide-react";
+// Lucide Icons
+import { Plane, Helicopter, Globe, ChevronLeft } from "lucide-react";
 
 export const runtime = "nodejs";
 export const revalidate = 86400; // 24h
@@ -14,6 +14,8 @@ export const revalidate = 86400; // 24h
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") || "https://www.airportlookup.com";
 
 /* ----------------------------- TYPES & INTERFACES ----------------------------- */
+
+type Props = { params: Promise<{ code: string }> };
 
 interface Airport {
   id: number;
@@ -113,7 +115,6 @@ function surfaceLabel(surface: string | null | undefined): string {
   return map[s] ?? surface ?? "—";
 }
 
-// Icon-Logik für die Nearby Liste
 const getAirportIcon = (type: string) => {
   switch (type) {
     case "large_airport": return <Plane size={16} className="text-blue-600" style={{ flexShrink: 0 }} />;
@@ -222,7 +223,7 @@ export default async function AirportPage({ params }: Props) {
 
   const nearby = await sql`
     SELECT ident, name, municipality, type,
-    (2 * 6371 * asin(sqrt(power(sin(radians((${airport.latitude_deg} - latitude_deg) / 2)), 2) + cos(radians(latitude_deg)) * cos(radians((${airport.latitude_deg}))) * power(sin(radians((${airport.longitude_deg} - longitude_deg) / 2)), 2)))) as dist,
+    (2 * 6371 * asin(sqrt(power(sin(radians((${airport.latitude_deg} - latitude_deg) / 2)), 2) + cos(radians(latitude_deg)) * cos(radians(${airport.latitude_deg})) * power(sin(radians((${airport.longitude_deg} - longitude_deg) / 2)), 2)))) as dist,
     EXISTS (SELECT 1 FROM runway_ils WHERE airport_ident = airports.ident) as has_ils
     FROM airports WHERE ident != ${airport.ident} AND type IN ('large_airport','medium_airport') ORDER BY dist ASC LIMIT 5
   `;
@@ -236,9 +237,7 @@ export default async function AirportPage({ params }: Props) {
   return (
     <main style={{ padding: 18, maxWidth: 720, margin: "0 auto", fontFamily: "system-ui" }}>
       <div style={{ marginBottom: 12 }}>
-        <Link href="/" style={{ color: "var(--foreground)", textDecoration: "none", display: "flex", alignItems: "center", gap: 4, fontWeight: 600 }}>
-          <ChevronLeft size={16} /> Back to Search
-        </Link>
+        <Link href="/" style={{ color: "var(--foreground)", textDecoration: "none", fontWeight: 600 }}>← Back to Search</Link>
       </div>
 
       {/* SAFETY DISCLAIMER BADGE */}
@@ -286,7 +285,7 @@ export default async function AirportPage({ params }: Props) {
           </div>
         </Card>
 
-        {/* Airport Details mit Country Link */}
+        {/* Airport Details */}
         <Card title="Airport Details" subtitle="Full geographical and organizational metadata.">
           <KV k="Full Name" v={airport.name} />
           <KV k="ICAO / IATA" v={`${airport.ident} / ${airport.iata_code || "—"}`} />
@@ -303,7 +302,7 @@ export default async function AirportPage({ params }: Props) {
           {airport.home_link && <KV k="Official Website" v={<a href={airport.home_link} target="_blank" style={{ color: "inherit" }}>Visit Site</a>} />}
         </Card>
 
-        {/* Runways & ILS Approach Data (DIE GROSSEN GRÜNEN BOXEN SIND HIER) */}
+        {/* Runways & ILS Approach Data */}
         <Card title="Runways & ILS Approach Data" subtitle="Detailed dimensions and instrument landing frequencies.">
           {runways.map((r) => {
             const ils = ilsData?.find((i) => i.runway_ident === r.le_ident || i.runway_ident === r.he_ident);
@@ -322,7 +321,7 @@ export default async function AirportPage({ params }: Props) {
                   <strong>Surface:</strong> {surfaceLabel(r.surface)} <br />
                   <strong>Heading:</strong> {r.le_heading_degt ?? "—"}° / {r.he_heading_degt ?? "—"}°
                 </div>
-                {/* HIER IST DIE ILS BOX */}
+                {/* GRÜNE ILS BOX */}
                 {ils && (
                   <div style={{ marginTop: 14, padding: 14, background: "rgba(34,197,94,0.05)", borderRadius: 10, border: "1px solid rgba(34,197,94,0.15)" }}>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
@@ -364,7 +363,7 @@ export default async function AirportPage({ params }: Props) {
           )) : <p style={{ color: "var(--muted)" }}>No navaids found in vicinity.</p>}
         </Card>
 
-        {/* Nearby Airports mit Icons und ILS Badges */}
+        {/* Nearby Airports */}
         <Card title="Nearby Airports" subtitle="Alternative airports in the vicinity (km & nm).">
           <div style={{ display: "grid", gap: 10 }}>
             {nearby.map((nb: any) => (
