@@ -6,7 +6,7 @@ import type { Metadata } from "next";
 import { sql } from "@/lib/db";
 import type { ReactNode } from "react";
 import { Plane, Helicopter, Globe, ChevronLeft, ExternalLink, Link as LinkIcon } from "lucide-react";
-
+import AirportSearch from "@/app/components/AirportSearch";
 export const runtime = "nodejs";
 export const revalidate = 86400; // 24h
 
@@ -275,43 +275,82 @@ export default async function AirportPage({ params }: Props) {
 
       <div style={{ display: "grid", gap: 14 }}>
         
-        {/* 1. KEY FACTS */}
-        <Card title="Key Facts" subtitle="Essential technical summary for MSFS 2020/2024 and X-Plane.">
-          <div style={{ display: "grid", gap: 12 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: hasIlsData ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.03)", borderRadius: 12, border: "1px solid var(--border)" }}>
-              <span style={{ fontWeight: 700, fontSize: 14 }}>ILS Approach Status</span>
-              <Badge text={hasIlsData ? "ILS FREQUENCIES VERIFIED ✅" : "ILS DATA NOT IN DATABASE"} tone={hasIlsData ? "ok" : "muted"} />
-            </div>
-            <KV k="Field Elevation" v={`${numFmt(airport.elevation_ft)} ft / ${fmtM(airport.elevation_ft)}`} />
-            {/* NEUE ZEILE HIER */}
+{/* 1. KEY FACTS */}
+<Card title="Key Facts" subtitle="Essential technical summary for MSFS 2020/2024 and X-Plane.">
+  <div className="space-y-3">
+    {/* ILS Status & Basic Info */}
+    <div className="flex justify-between items-center p-3 bg-emerald-500/5 rounded-xl border border-emerald-500/10">
+      <span className="font-bold text-sm text-emerald-400">ILS Approach Status</span>
+      <Badge 
+        text={hasIlsData ? "ILS FREQUENCIES VERIFIED ✅" : "ILS DATA NOT IN DATABASE"} 
+        tone={hasIlsData ? "ok" : "muted"} 
+      />
+    </div>
+    
+    <KV k="Field Elevation" v={`${numFmt(airport.elevation_ft)} ft / ${fmtM(airport.elevation_ft)}`} />
+    
     <KV 
       k="Transition Altitude" 
       v={
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div className="flex items-center gap-2">
           {ta.value}
           {ta.isNational && (
-            <span style={{ fontSize: 10, background: "rgba(255,255,255,0.05)", padding: "2px 6px", borderRadius: 4, color: "var(--muted)", border: "1px solid var(--border)" }}>
+            <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded border border-slate-700">
               National Standard
             </span>
           )}
         </div>
       } 
     />
-            <KV k="Primary Channel" v={primaryFreq ? `${primaryFreq.type} ${primaryFreq.frequency_mhz.toFixed(2)} MHz (${primaryFreq.description || ""})` : "—"} />
-            
-            <div style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 12, background: "rgba(255,255,255,0.02)" }}>
-              <div style={{ fontWeight: 700, color: "var(--muted)", marginBottom: 8, fontSize: 12, textTransform: "uppercase" }}>Runway Summary (Quick-Links)</div>
-              {runways.map((r) => (
-                <a key={r.id} href={`#runway-${r.le_ident}`} style={{ textDecoration: "none", color: "inherit", display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 14, padding: "4px 8px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid transparent" }} className="hover:border-emerald-500/30 transition-colors">
-                  <span style={{ fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
-                    <LinkIcon size={12} className="text-emerald-500" /> {r.le_ident}/{r.he_ident} · {numFmt(r.length_ft)} ft · {surfaceLabel(r.surface)}
-                  </span>
-                  <Badge text={asBool(r.lighted) ? "LIGHTED" : "UNLIT"} tone={asBool(r.lighted) ? "ok" : "muted"} />
-                </a>
-              ))}
-            </div>
-          </div>
-        </Card>
+
+    <KV k="Primary Channel" v={primaryFreq ? `${primaryFreq.type} ${primaryFreq.frequency_mhz.toFixed(2)} MHz` : "—"} />
+
+    {/* Runway Quick-Links */}
+    <div className="mt-4 p-3 bg-white/5 rounded-xl border border-white/5">
+      <div className="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-widest">Runway Quick-Links</div>
+      <div className="space-y-2">
+        {runways.map((r) => (
+          <a key={r.id} href={`#runway-${r.le_ident}`} className="flex justify-between items-center p-2 rounded-lg bg-white/5 hover:bg-emerald-500/10 border border-transparent hover:border-emerald-500/20 transition-all group">
+            <span className="text-sm font-semibold flex items-center gap-2">
+              <LinkIcon size={12} className="text-emerald-500 group-hover:scale-110 transition-transform" />
+              {r.le_ident}/{r.he_ident} <span className="text-slate-500 font-normal">· {numFmt(r.length_ft)} ft</span>
+            </span>
+            <Badge text={asBool(r.lighted) ? "LIT" : "UNLIT"} tone={asBool(r.lighted) ? "ok" : "muted"} />
+          </a>
+        ))}
+      </div>
+    </div>
+  </div>
+</Card>
+
+{/* 2. FLIGHT PLANNING / SEARCH WIDGET */}
+<section style={{ 
+  marginTop: 20, 
+  background: "rgba(59, 130, 246, 0.05)", 
+  border: "1px solid rgba(59, 130, 246, 0.2)", 
+  borderRadius: 18, 
+  padding: 18,
+  boxShadow: "0 4px 15px rgba(0,0,0,0.05)"
+}}>
+  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+    <div style={{ padding: 8, background: "rgba(59, 130, 246, 0.1)", borderRadius: 10 }}>
+      <Plane size={20} className="text-blue-500" />
+    </div>
+    <div>
+      <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Flight Planning</h3>
+      <p style={{ margin: 0, fontSize: 12, color: "var(--muted)", fontWeight: 500, textTransform: "uppercase", letterSpacing: 0.5 }}>
+        Quick Jump to Next Destination
+      </p>
+    </div>
+  </div>
+  
+  {/* Die eigentliche Suchkomponente */}
+  <AirportSearch /> 
+  
+  <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 12, fontStyle: "italic", textAlign: "center" }}>
+    Tip: Enter ICAO or City to quickly check your alternate airport data.
+  </p>
+</section>
 
 {/* 2. TECHNICAL FLIGHT BRIEFING TEXT */}
 <div style={{ padding: "16px", background: "rgba(34,197,94,0.03)", borderRadius: 14, border: "1px solid var(--border)", lineHeight: "1.6", fontSize: "15px", color: "var(--muted)" }}>
