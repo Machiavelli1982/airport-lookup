@@ -1,68 +1,61 @@
-// web/scripts/import-faa-approaches.mjs
 import { config } from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fetch from 'node-fetch';
 import { parseStringPromise } from 'xml2js';
 
-// 1. Umgebungsvariablen laden
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const envPath = path.resolve(__dirname, '../.env.local');
-config({ path: envPath });
-
-// 2. Datenbank dynamisch importieren (verhindert Fehler, wenn env noch nicht geladen ist)
+config({ path: path.resolve(__dirname, '../.env.local') });
 const { sql } = await import('../lib/db.ts');
 
-// AKTUELLER ZYKLUS JANUAR 2026
 const CYCLE = "2601"; 
 const FAA_XML_URL = `https://aeronav.faa.gov/d-tpp/${CYCLE}/xml_data/d-TPP_Metafile.xml`; 
 
+// Hilfsfunktion: Extrahiert die Runway (z.B. "ILS RWY 04L" -> "04L")
+function extractRunway(name) {
+  const match = name.match(/RWY\s?(\d{1,2}[LRC]?)/i);
+  return match ? match[1].toUpperCase() : null;
+}
+
 async function importFAA() {
-  console.log(`✈️  Fetching FAA d-TPP Metafile for Cycle ${CYCLE}...`);
+  console.log(`🚀 Starte Deep-Data Import für Zyklus ${CYCLE}...`);
   
   try {
     const response = await fetch(FAA_XML_URL);
-    
-    if (response.status === 404) {
-      throw new Error(`FAA Cycle ${CYCLE} nicht gefunden. Prüfe https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/dtpp/ für den aktuellen Zyklus.`);
-    }
-
-    if (!response.ok) {
-      throw new Error(`FAA Server Fehler: ${response.status}`);
-    }
-    
-    const xml = await response.text();
-    const data = await parseStringPromise(xml);
+    const data = await parseStringPromise(await response.text());
     const digital_tpp = data.digital_tpp;
     let count = 0;
 
-    console.log("💾 Synchronisiere Neon Datenbank...");
+    console.log("💾 Befülle Neon-Datenbank mit Deep-Data & Runway-Mapping...");
 
     for (const state of digital_tpp.state_code) {
+      const sCode = state.$.ID;
       for (const city of state.city_name) {
+        const cityName = city.$.ID;
         for (const airport of city.airport_name) {
-          // FIX: Zugriff auf XML-Attribute über .$
-          const faaId = airport.$?.ID; // Der FAA Identifier (z.B. JFK)
-          const icao = airport.$?.icao; // Der ICAO Code (z.B. KJFK)
-          
-          // Falls kein Ident vorhanden ist, überspringen
-          if (!faaId && !icao) continue;
+          const faaId = airport.$?.ID; 
+          const icao = airport.$?.icao;
+          const airportFull = airport._?.trim() || faaId;
 
           if (airport.record) {
             for (const record of airport.record) {
-              const type = record.chart_code[0];
               const name = record.chart_name[0];
-              const pdfName = record.pdf_name[0];
+              const rwy = extractRunway(name); 
               
-              // Konstruktion der PDF-URL
-              const chartUrl = `https://aeronav.faa.gov/d-tpp/${CYCLE}/${pdfName}`;
-
-              // Wir nutzen bevorzugt den ICAO-Code (KJFK) für deine DB-Struktur
-              const airportIdent = icao || faaId;
-
               await sql`
-                INSERT INTO airport_approaches (airport_ident, procedure_name, procedure_type, chart_url)
-                VALUES (${airportIdent}, ${name}, ${type}, ${chartUrl})
+                INSERT INTO airport_approaches 
+                (icao, faa_ident, airport_name, city, state_code, procedure_name, procedure_type, runway_designator, chart_url)
+                VALUES (
+                  ${icao || null}, 
+                  ${faaId}, 
+                  ${airportFull}, 
+                  ${cityName}, 
+                  ${sCode}, 
+                  ${name}, 
+                  ${record.chart_code[0]}, 
+                  ${rwy}, 
+                  ${`https://aeronav.faa.gov/d-tpp/${CYCLE}/${record.pdf_name[0]}`}
+                )
                 ON CONFLICT DO NOTHING
               `;
               count++;
@@ -71,7 +64,7 @@ async function importFAA() {
         }
       }
     }
-    console.log(`✅ Fertig! ${count} Prozeduren mit korrekten Identifiern importiert.`);
+    console.log(`✅ Fertig! ${count} Deep-Data Einträge importiert.`);
   } catch (error) {
     console.error("❌ Fehler beim Import:", error.message);
   } finally {
