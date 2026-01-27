@@ -5,8 +5,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { sql } from "@/lib/db";
 import type { ReactNode } from "react";
-// Lucide Icons
-import { Plane, Helicopter, Globe, ChevronLeft, Map, ExternalLink, Link as LinkIcon } from "lucide-react";
+import { Plane, Helicopter, Globe, ChevronLeft, ExternalLink, Link as LinkIcon } from "lucide-react";
 
 export const runtime = "nodejs";
 export const revalidate = 86400; // 24h
@@ -49,17 +48,6 @@ interface Frequency {
   type: string;
   description: string | null;
   frequency_mhz: number;
-}
-
-interface Navaid {
-  id: number;
-  ident: string;
-  type: string;
-  name: string;
-  frequency_khz: number;
-  latitude_deg: number;
-  longitude_deg: number;
-  elevation_ft: number | null;
 }
 
 interface RunwayIls {
@@ -217,10 +205,9 @@ export default async function AirportPage({ params }: Props) {
   const airport = airportRows?.[0];
   if (!airport) notFound();
 
-  const [runways, frequencies, navaids, countryName, regionName, ilsData] = await Promise.all([
+  const [runways, frequencies, countryName, regionName, ilsData] = await Promise.all([
     sql<Runway[]>`SELECT * FROM runways WHERE airport_ref = ${airport.id} ORDER BY length_ft DESC NULLS LAST`,
     sql<Frequency[]>`SELECT * FROM frequencies WHERE airport_ref = ${airport.id} ORDER BY type ASC, frequency_mhz ASC`,
-    sql<Navaid[]>`SELECT * FROM navaids WHERE associated_airport = ${airport.ident} ORDER BY type ASC, ident ASC`,
     lookupCountryName(airport.iso_country),
     lookupRegionName(airport.iso_region),
     sql<RunwayIls[]>`SELECT * FROM runway_ils WHERE airport_ident = ${airport.ident}`
@@ -257,8 +244,8 @@ export default async function AirportPage({ params }: Props) {
 
       <div style={{ display: "grid", gap: 14 }}>
         
-        {/* 1. KEY FACTS (Ganz oben, wie gewünscht) */}
-        <Card title="Key Facts" subtitle="Essential technical summary for Microsoft Flight Simulator.">
+        {/* 1. KEY FACTS */}
+        <Card title="Key Facts" subtitle="Essential technical summary for MSFS 2020/2024 and X-Plane.">
           <div style={{ display: "grid", gap: 12 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: hasIlsData ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.03)", borderRadius: 12, border: "1px solid var(--border)" }}>
               <span style={{ fontWeight: 700, fontSize: 14 }}>ILS Approach Status</span>
@@ -272,7 +259,7 @@ export default async function AirportPage({ params }: Props) {
               {runways.map((r) => (
                 <a key={r.id} href={`#runway-${r.le_ident}`} style={{ textDecoration: "none", color: "inherit", display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 14, padding: "4px 8px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid transparent" }} className="hover:border-emerald-500/30 transition-colors">
                   <span style={{ fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
-                    <LinkIcon size={12} className="text-emerald-500" /> {r.le_ident}/{r.he_ident} · {numFmt(r.length_ft)} ft
+                    <LinkIcon size={12} className="text-emerald-500" /> {r.le_ident}/{r.he_ident} · {numFmt(r.length_ft)} ft · {surfaceLabel(r.surface)}
                   </span>
                   <Badge text={asBool(r.lighted) ? "LIGHTED" : "UNLIT"} tone={asBool(r.lighted) ? "ok" : "muted"} />
                 </a>
@@ -281,15 +268,49 @@ export default async function AirportPage({ params }: Props) {
           </div>
         </Card>
 
-        {/* 2. SEO BRIEFING TEXT */}
+        {/* 2. TECHNICAL FLIGHT BRIEFING TEXT */}
         <div style={{ padding: "16px", background: "rgba(34,197,94,0.03)", borderRadius: 14, border: "1px solid var(--border)", lineHeight: "1.6", fontSize: "15px", color: "var(--muted)" }}>
-          Technical flight briefing for <strong>{airport.name} ({airport.ident})</strong>. 
-          As a vital hub for <strong>MSFS 2024</strong> pilots in <strong>{countryName}</strong>, this airport features 
-          {runways.length} active {runways.length === 1 ? 'runway' : 'runways'}. 
-          {hasIlsData ? `Precision approaches are supported with verified ILS frequencies.` : `This field primarily supports VFR and visual approaches.`} 
+          Welcome to the technical flight briefing for <strong>{airport.name} ({airport.ident})</strong>, located in <strong>{airport.municipality || "the region of"}, {countryName}</strong>. 
+          As a vital hub for <strong>Microsoft Flight Simulator 2024</strong>, MSFS 2020, and X-Plane pilots, this facility features 
+          <strong> {runways.length} active {runways.length === 1 ? 'runway' : 'runways'}</strong> with a maximum elevation of {numFmt(airport.elevation_ft)} ft. 
+          {hasIlsData 
+            ? `Instrument approaches (IFR) are supported with verified ILS frequencies and identifiers for precision landings.` 
+            : `Please note that this field primarily supports VFR and visual approach procedures.`} 
+          Reference the data below for primary communication channels and detailed runway characteristics.
         </div>
 
-        {/* 3. RUNWAYS & ILS APPROACH DATA (Kern-Funktion) */}
+        {/* 3. AIRPORT DETAILS */}
+        <Card title="Airport Details" subtitle="Full geographical and organizational metadata.">
+          <KV k="Full Name" v={airport.name} />
+          <KV k="ICAO / IATA" v={`${airport.ident} / ${airport.iata_code || "—"}`} />
+          <KV k="Municipality" v={airport.municipality} />
+          <KV k="Country" v={airport.iso_country ? (
+            <Link href={`/countries/${airport.iso_country.toLowerCase()}`} style={{ color: "var(--foreground)", fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
+              <Globe size={14} className="text-blue-500" /> {airport.iso_country}{countryName ? ` — ${countryName}` : ""}
+            </Link>
+          ) : "—"} />
+          <KV k="Region" v={airport.iso_region ? `${airport.iso_region}${regionName ? ` — ${regionName}` : ""}` : "—"} />
+          <KV k="GPS Coordinates" v={<a href={googleMapsLink(airport.latitude_deg, airport.longitude_deg)} target="_blank" style={{ color: "var(--foreground)", fontWeight: 700 }}>📍 {fmtCoord(airport.latitude_deg)}, {fmtCoord(airport.longitude_deg)} 🗺️</a>} />
+          {airport.home_link && <KV k="Official Website" v={<a href={airport.home_link} target="_blank" style={{ color: "var(--foreground)", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 4 }}>Visit Site <ExternalLink size={14} /></a>} />}
+          {airport.wikipedia_link && <KV k="Wikipedia" v={<a href={airport.wikipedia_link} target="_blank" style={{ color: "inherit" }}>Open Article</a>} />}
+        </Card>
+
+        {/* 4. PILOT TOOLBOX */}
+        <Card title="Pilot Toolbox" subtitle="External charts, live tracking and satellite imagery.">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <a href={skyVectorLink(airport.ident)} target="_blank" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px", border: "1px solid var(--border)", borderRadius: 12, textDecoration: "none", color: "var(--foreground)", fontWeight: 700, background: "rgba(255,255,255,0.02)" }}>
+               🗺️ SkyVector Charts
+            </a>
+            <a href={flightAwareLink(airport.ident)} target="_blank" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px", border: "1px solid var(--border)", borderRadius: 12, textDecoration: "none", color: "var(--foreground)", fontWeight: 700, background: "rgba(255,255,255,0.02)" }}>
+               📡 FlightAware Live
+            </a>
+            <a href={googleMapsSatellite(airport.latitude_deg, airport.longitude_deg)} target="_blank" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px", border: "1px solid var(--border)", borderRadius: 12, textDecoration: "none", color: "var(--foreground)", fontWeight: 700, gridColumn: "span 2", background: "rgba(255,255,255,0.02)" }}>
+               🌍 Google Maps Satellite View (Runway Check)
+            </a>
+          </div>
+        </Card>
+
+        {/* 5. RUNWAYS & ILS APPROACH DATA */}
         <Card title="Runways & ILS Approach Data" subtitle="Detailed dimensions and instrument landing frequencies.">
           {runways.map((r) => {
             const ils = ilsData?.find((i) => i.runway_ident === r.le_ident || i.runway_ident === r.he_ident);
@@ -321,37 +342,6 @@ export default async function AirportPage({ params }: Props) {
           })}
         </Card>
 
-        {/* 4. PILOT TOOLBOX (Weiter nach unten verschoben) */}
-        <Card title="Pilot Toolbox" subtitle="External charts, live tracking and satellite imagery.">
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <a href={skyVectorLink(airport.ident)} target="_blank" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px", border: "1px solid var(--border)", borderRadius: 12, textDecoration: "none", color: "var(--foreground)", fontWeight: 700, background: "rgba(255,255,255,0.02)" }}>
-               🗺️ SkyVector Charts
-            </a>
-            <a href={flightAwareLink(airport.ident)} target="_blank" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px", border: "1px solid var(--border)", borderRadius: 12, textDecoration: "none", color: "var(--foreground)", fontWeight: 700, background: "rgba(255,255,255,0.02)" }}>
-               📡 FlightAware Live
-            </a>
-            <a href={googleMapsSatellite(airport.latitude_deg, airport.longitude_deg)} target="_blank" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px", border: "1px solid var(--border)", borderRadius: 12, textDecoration: "none", color: "var(--foreground)", fontWeight: 700, gridColumn: "span 2", background: "rgba(255,255,255,0.02)" }}>
-               🌍 Google Maps Satellite View (Runway Check)
-            </a>
-          </div>
-        </Card>
-
-        {/* 5. AIRPORT DETAILS (Inkl. restored Home Link) */}
-        <Card title="Airport Details" subtitle="Full geographical and organizational metadata.">
-          <KV k="Full Name" v={airport.name} />
-          <KV k="ICAO / IATA" v={`${airport.ident} / ${airport.iata_code || "—"}`} />
-          <KV k="Municipality" v={airport.municipality} />
-          <KV k="Country" v={airport.iso_country ? (
-            <Link href={`/countries/${airport.iso_country.toLowerCase()}`} style={{ color: "var(--foreground)", fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
-              <Globe size={14} className="text-blue-500" /> {airport.iso_country}{countryName ? ` — ${countryName}` : ""}
-            </Link>
-          ) : "—"} />
-          <KV k="GPS Coordinates" v={<a href={googleMapsLink(airport.latitude_deg, airport.longitude_deg)} target="_blank" style={{ color: "var(--foreground)", fontWeight: 700 }}>📍 {fmtCoord(airport.latitude_deg)}, {fmtCoord(airport.longitude_deg)} 🗺️</a>} />
-          {/* RESTORED: Official Website & Wikipedia */}
-          {airport.home_link && <KV k="Official Website" v={<a href={airport.home_link} target="_blank" style={{ color: "var(--foreground)", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 4 }}>Visit Site <ExternalLink size={14} /></a>} />}
-          {airport.wikipedia_link && <KV k="Wikipedia" v={<a href={airport.wikipedia_link} target="_blank" style={{ color: "inherit" }}>Open Article</a>} />}
-        </Card>
-
         {/* 6. COMMUNICATION FREQUENCIES */}
         <Card title="Communication Frequencies" subtitle="Air traffic control and advisory channels.">
           {frequencies.length > 0 ? frequencies.map((f) => (
@@ -362,7 +352,7 @@ export default async function AirportPage({ params }: Props) {
           )) : <p style={{ color: "var(--muted)" }}>No frequency data available.</p>}
         </Card>
 
-        {/* 7. NEARBY AIRPORTS (Interne Verlinkung & Traffic Flow) */}
+        {/* 7. NEARBY AIRPORTS */}
         <Card title="Nearby Airports" subtitle="Alternative airports in the vicinity (km & nm).">
           <div style={{ display: "grid", gap: 10 }}>
             {nearby.map((nb: any) => (
