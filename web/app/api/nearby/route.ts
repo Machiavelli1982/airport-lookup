@@ -46,12 +46,17 @@ export async function GET(req: Request) {
         municipality,
         iso_country,
         type,
-        (${distanceKm}) as distance_km
+        (${distanceKm}) as distance_km,
+        -- ILS Check (SEO & User Engagement)
+        EXISTS (
+          SELECT 1 FROM runway_ils 
+          WHERE airport_ident = airports.ident
+        ) as has_ils
       FROM airports
       WHERE
         latitude_deg IS NOT NULL
         AND longitude_deg IS NOT NULL
-        -- NEU: Wir beziehen nun auch kleine Plätze und Heliports mit ein
+        -- Wir beziehen nun auch kleine Plätze und Heliports mit ein
         AND type IN ('large_airport','medium_airport','small_airport','heliport')
       ORDER BY 
         distance_km ASC,
@@ -78,7 +83,12 @@ export async function GET(req: Request) {
         iata_code as iata,
         name,
         municipality,
-        type
+        type,
+        -- ILS Check (SEO & User Engagement)
+        EXISTS (
+          SELECT 1 FROM runway_ils 
+          WHERE airport_ident = airports.ident
+        ) as has_ils
       FROM airports
       WHERE
         iso_country = ${cc}

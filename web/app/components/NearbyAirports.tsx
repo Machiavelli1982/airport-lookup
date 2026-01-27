@@ -11,6 +11,7 @@ type NearbyItem = {
   municipality?: string;
   type: string;
   distance_km?: number;
+  has_ils: boolean; // Neu: Für die Anzeige des ILS-Badges
 };
 
 export default function NearbyAirports() {
@@ -90,7 +91,6 @@ export default function NearbyAirports() {
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((item) => {
-          // Hier wird die Info pro Item geladen
           const { icon, label } = getTypeInfo(item.type);
           
           return (
@@ -104,8 +104,15 @@ export default function NearbyAirports() {
                   {icon}
                 </div>
                 <div className="overflow-hidden">
-                  <div className="font-bold text-sm text-neutral-900 dark:text-white truncate">
+                  <div className="font-bold text-sm text-neutral-900 dark:text-white truncate flex items-center gap-2">
                     {item.icao} {item.iata ? `/ ${item.iata}` : ""}
+                    
+                    {/* SEO ILS Badge */}
+                    {item.has_ils && (
+                      <span className="text-[9px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-1 py-0.5 rounded leading-none uppercase tracking-tighter shrink-0">
+                        ILS
+                      </span>
+                    )}
                   </div>
                   <div className="text-[10px] font-medium text-neutral-400 uppercase tracking-tight truncate">
                     {label} • {item.name}
