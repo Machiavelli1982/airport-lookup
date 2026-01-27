@@ -8,14 +8,15 @@ export default async function ApproachesPage({ params }: { params: Promise<{ cod
   const { code } = await params;
   const ident = code.toUpperCase();
   
-  // US-Spezialfall: Erstelle eine Variante ohne das führende 'K'
+  // US-Spezialfall: JFK (3-stellig) vs KJFK (4-stellig)
   const shortIdent = ident.startsWith('K') && ident.length === 4 ? ident.substring(1) : ident;
 
   const [airport, faaCharts] = await Promise.all([
     sql`SELECT name, ident FROM airports WHERE ident = ${ident} LIMIT 1`,
+    // Wir suchen nach beiden Varianten und nutzen ILIKE für Case-Insensitivity
     sql`SELECT * FROM airport_approaches 
-        WHERE airport_ident = ${ident} 
-        OR airport_ident = ${shortIdent} 
+        WHERE TRIM(airport_ident) ILIKE ${ident} 
+        OR TRIM(airport_ident) ILIKE ${shortIdent} 
         ORDER BY procedure_name ASC`
   ]);
 
