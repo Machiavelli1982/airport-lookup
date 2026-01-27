@@ -1,64 +1,61 @@
 // web/app/airports/[code]/arrivals/page.tsx
 import { sql } from "@/lib/db";
 import { notFound } from "next/navigation";
-import { ChevronLeft, PlaneLanding, Info } from "lucide-react";
+import { ChevronLeft, PlaneLanding, MapPin, Wind } from "lucide-react";
 import Link from "next/link";
 import Card from "@/app/components/Card";
-
-export const runtime = "nodejs";
 
 export default async function ArrivalsPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
   const ident = code.toUpperCase();
 
-  const airportRows = await sql`SELECT name, ident, municipality, type FROM airports WHERE ident = ${ident} LIMIT 1`;
-  const airport = airportRows?.[0];
-
+  const airport = (await sql`SELECT * FROM airports WHERE ident = ${ident} LIMIT 1`)[0];
   if (!airport) notFound();
+
+  // Wir holen nahegelegene Flughäfen als potenzielle "Origins"
+  const origins = await sql`
+    SELECT ident, name, municipality, dist 
+    FROM (SELECT *, (2 * 6371 * asin(sqrt(power(sin(radians((${airport.latitude_deg} - latitude_deg) / 2)), 2) + cos(radians(latitude_deg)) * cos(radians(${airport.latitude_deg})) * power(sin(radians((${airport.longitude_deg} - longitude_deg) / 2)), 2)))) as dist FROM airports) a
+    WHERE ident != ${ident} AND type IN ('large_airport', 'medium_airport')
+    ORDER BY dist ASC LIMIT 8
+  `;
 
   return (
     <main style={{ padding: 18, maxWidth: 720, margin: "0 auto", fontFamily: "system-ui" }}>
-      <div style={{ marginBottom: 12 }}>
-        <Link href={`/airports/${ident}`} style={{ color: "var(--foreground)", textDecoration: "none", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
-          <ChevronLeft size={16} /> Back to {ident} Overview
-        </Link>
-      </div>
+      <Link href={`/airports/${ident}`} style={{ color: "var(--foreground)", textDecoration: "none", display: "flex", alignItems: "center", gap: 4, fontSize: 14, fontWeight: 600 }}>
+        <ChevronLeft size={16} /> Back to {airport.name}
+      </Link>
 
-      <h1 style={{ fontSize: 36, margin: "8px 0 2px", fontWeight: 800 }}>{ident} Arrivals</h1>
-      <p style={{ margin: 0, fontSize: 18, color: "var(--muted)", fontWeight: 500 }}>
-        Arrival Guide & Flight Patterns · {airport.name}
-      </p>
+      <h1 style={{ fontSize: 32, fontWeight: 800, margin: "16px 0 4px" }}>{ident} Arrivals</h1>
+      <p style={{ color: "var(--muted)", marginBottom: 24 }}>Typical Arrival Patterns & IFR Procedures</p>
 
-      <div style={{ height: 24 }} />
-
-      {/* SEO-TEXT: Wichtig für das Google Ranking */}
-      <section style={{ marginBottom: 20, padding: 16, background: "rgba(34,197,94,0.03)", borderRadius: 14, border: "1px solid var(--border)", fontSize: 14, lineHeight: "1.6", color: "var(--muted)" }}>
-        <div style={{ display: "flex", gap: 8, marginBottom: 8, color: "var(--foreground)" }}>
-          <Info size={18} /> <strong style={{ fontWeight: 700 }}>MSFS 2024 Arrival Briefing</strong>
-        </div>
-        Welcome to the arrival board for <strong>{airport.name}</strong>. For pilots using Microsoft Flight Simulator, 
-        understanding the flow of traffic is key for a realistic approach. This page provides the technical basis 
-        for planning your descent into {airport.municipality || ident}.
-      </section>
-
-      <Card title="Traffic Information" subtitle="Flight patterns for virtual airline planning.">
-        <div style={{ padding: "40px 20px", textAlign: "center", background: "rgba(255,255,255,0.02)", borderRadius: 14, border: "1px dashed var(--border)" }}>
-          <PlaneLanding size={32} style={{ color: "var(--muted)", marginBottom: 12, opacity: 0.5 }} />
-          <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Standard Arrival Routes (STAR)</h3>
-          <p style={{ color: "var(--muted)", fontSize: 14, margin: 0 }}>
-            Typical arrival traffic for {airport.type === 'large_airport' ? 'commercial hub' : 'regional airfield'} operations.
-          </p>
-          <div style={{ marginTop: 20 }}>
-             <Link href={`/airports/${ident}`} style={{ color: "var(--foreground)", fontWeight: 700, textDecoration: "underline" }}>
-                Check {ident} ILS Frequencies for Landing →
-             </Link>
-          </div>
+      <Card title="Typical Origin Airports" subtitle="Common regional flight connections for MSFS planning.">
+        <div style={{ display: "grid", gap: 12 }}>
+          {origins.map((o: any) => (
+            <div key={o.ident} style={{ display: "flex", justifyContent: "space-between", padding: "12px", background: "rgba(255,255,255,0.03)", borderRadius: 12, border: "1px solid var(--border)" }}>
+              <div>
+                <div style={{ fontWeight: 700 }}>{o.ident} — {o.municipality}</div>
+                <div style={{ fontSize: 12, color: "var(--muted)" }}>{o.name}</div>
+              </div>
+              <div style={{ textAlign: "right", fontSize: 12, fontWeight: 600 }}>
+                {Math.round(o.dist * 0.54)} nm <br />
+                <span style={{ color: "var(--muted)" }}>Est. ETE: {Math.round(o.dist / 7)} min</span>
+              </div>
+            </div>
+          ))}
         </div>
       </Card>
 
-      <footer style={{ marginTop: 40, padding: 20, borderTop: "1px solid var(--border)", textAlign: "center", fontSize: 11, color: "var(--muted)" }}>
-        Data for flight simulation purposes. Not for real-world aviation use.
-      </footer>
+      <section style={{ marginTop: 24, padding: 16, background: "rgba(59, 130, 246, 0.05)", borderRadius: 16, border: "1px solid var(--border)" }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
+          <Wind size={18} className="text-blue-400" /> STAR Briefing (Standard Arrival)
+        </h3>
+        <p style={{ fontSize: 14, color: "var(--muted)", lineHeight: "1.6" }}>
+          For your approach into <strong>{airport.name}</strong>, expect vectoring based on current VATSIM or MSFS Live Traffic. 
+          The elevation of <strong>{airport.elevation_ft} ft</strong> requires a stabilized approach. 
+          Check the <Link href={`/airports/${ident}#runways`} style={{ color: "var(--foreground)", fontWeight: 700 }}>ILS Frequencies</Link> for the active runway.
+        </p>
+      </section>
     </main>
   );
 }
