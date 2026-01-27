@@ -5,16 +5,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { sql } from "@/lib/db";
 import type { ReactNode } from "react";
-import { 
-  Plane, 
-  Helicopter, 
-  ShieldCheck, 
-  Globe, 
-  MapPin, 
-  Database, 
-  ChevronLeft,
-  Activity
-} from "lucide-react";
+import { Plane, Helicopter, Globe, ChevronLeft } from "lucide-react";
 
 export const runtime = "nodejs";
 export const revalidate = 86400; // 24h
@@ -68,7 +59,7 @@ function norm(code: string | undefined | null) {
 function numFmt(n: number | string | null | undefined): string {
   const x = Number(n);
   if (!Number.isFinite(x)) return "0";
-  return x.toLocaleString();
+  return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
 function fmtFt(n: any) {
@@ -97,12 +88,13 @@ function surfaceLabel(surface: any) {
   return map[s] ?? surface;
 }
 
+// Icon-Logik für Nearby Liste
 const getIcon = (type: string) => {
   switch (type) {
-    case "large_airport": return <Plane size={16} className="text-blue-600 shrink-0" />;
-    case "medium_airport": return <Plane size={14} className="text-emerald-600 shrink-0" />;
-    case "heliport": return <Helicopter size={14} className="text-purple-600 shrink-0" />;
-    default: return <Plane size={14} className="text-neutral-400 shrink-0" />;
+    case "large_airport": return <Plane size={16} className="text-blue-600" style={{ flexShrink: 0 }} />;
+    case "medium_airport": return <Plane size={14} className="text-emerald-600" style={{ flexShrink: 0 }} />;
+    case "heliport": return <Helicopter size={14} className="text-purple-600" style={{ flexShrink: 0 }} />;
+    default: return <Plane size={14} className="text-neutral-400" style={{ flexShrink: 0 }} />;
   }
 };
 
@@ -127,7 +119,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const codes = `${a.ident}${a.iata_code ? ` / ${a.iata_code}` : ""}`;
   return {
     title: `${codes} — ${a.name} (Runways, ILS, Frequencies)`,
-    description: `Technical MSFS data for ${a.name} (${a.ident}). Runway lighting, verified 2026 ILS frequencies, and radio comms.`,
+    description: `Technical flight simulator data for ${a.name} (${a.ident}). Runway lighting, verified 2026 ILS frequencies, and radio comms.`,
     alternates: { canonical: `/airports/${a.ident}` },
   };
 }
@@ -138,43 +130,34 @@ function Badge({ text, tone = "muted" }: { text: string; tone?: "ok" | "muted" |
   const colors = {
     ok: { bg: "rgba(34,197,94,0.14)", fg: "rgba(34,197,94,1)" },
     warn: { bg: "rgba(245,158,11,0.16)", fg: "rgba(245,158,11,1)" },
-    muted: { bg: "rgba(255,255,255,0.08)", fg: "rgba(255,255,255,0.5)" },
+    muted: { bg: "rgba(255,255,255,0.08)", fg: "var(--muted)" },
   };
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", padding: "4px 10px", borderRadius: 999,
-      fontSize: 11, fontWeight: 800, background: colors[tone].bg, color: colors[tone].fg,
-      border: "1px solid rgba(255,255,255,0.1)", letterSpacing: 0.5, textTransform: "uppercase"
+      fontSize: 12, fontWeight: 700, background: colors[tone].bg, color: colors[tone].fg,
+      border: "1px solid var(--border)", letterSpacing: 0.2
     }}>
       {text}
     </span>
   );
 }
 
-function Card({ title, subtitle, children, icon: Icon }: { title: string; subtitle?: string; children?: ReactNode; icon?: any }) {
+function Card({ title, subtitle, children }: { title: string; subtitle?: string; children?: ReactNode }) {
   return (
-    <section style={{ 
-      background: "var(--card)", 
-      border: "1px solid var(--border)", 
-      borderRadius: 24, 
-      padding: 24, 
-      boxShadow: "0 4px 20px rgba(0,0,0,0.08)" 
-    }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: subtitle ? 4 : 16 }}>
-        {Icon && <Icon size={20} className="text-blue-500" />}
-        <h2 style={{ fontSize: 20, margin: 0, color: "var(--foreground)", fontWeight: 800, letterSpacing: "-0.02em" }}>{title}</h2>
-      </div>
-      {subtitle && <p style={{ margin: "0 0 16px", color: "var(--muted)", fontWeight: 600, fontSize: 14 }}>{subtitle}</p>}
-      <div>{children}</div>
+    <section style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 18, padding: 18, boxShadow: "0 2px 10px rgba(0,0,0,0.04)" }}>
+      <h2 style={{ fontSize: 22, margin: 0, color: "var(--foreground)", fontWeight: 700 }}>{title}</h2>
+      {subtitle && <p style={{ margin: "6px 0 0", color: "var(--muted)", fontWeight: 500 }}>{subtitle}</p>}
+      <div style={{ marginTop: 14 }}>{children}</div>
     </section>
   );
 }
 
 function KV({ k, v }: { k: string; v: ReactNode }) {
   return (
-    <div style={{ display: "flex", gap: 12, padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
-      <div style={{ flex: "0 0 140px", color: "var(--muted)", fontWeight: 600, fontSize: 14 }}>{k}</div>
-      <div style={{ fontWeight: 700, color: "var(--foreground)", fontSize: 14, overflowWrap: "anywhere" }}>{v ?? "—"}</div>
+    <div style={{ display: "flex", gap: 10, padding: "6px 0", flexWrap: "wrap" }}>
+      <div style={{ flex: "0 1 170px", color: "var(--muted)", fontWeight: 600 }}>{k}</div>
+      <div style={{ fontWeight: 600, color: "var(--foreground)", flex: "1 1 220px", overflowWrap: "anywhere" }}>{v ?? "—"}</div>
     </div>
   );
 }
@@ -184,7 +167,6 @@ function KV({ k, v }: { k: string; v: ReactNode }) {
 export default async function AirportPage(props: Props) {
   const { code: rawCode } = await props.params;
   const code = norm(rawCode);
-  
   const airportRows = await sql`SELECT * FROM airports WHERE ident = ${code} OR iata_code = ${code} LIMIT 1`;
   const airport = airportRows?.[0] as Airport | undefined;
   if (!airport) notFound();
@@ -206,214 +188,110 @@ export default async function AirportPage(props: Props) {
   ]);
 
   const ilsSource = airport.iso_country === "US" ? "FAA NASR" : "AIP 2026 Researched";
+  const ilsUpdated = "2026-01-26";
 
   return (
-    <main style={{ padding: "20px 16px 60px", maxWidth: 800, margin: "0 auto", fontFamily: "var(--font-sans)" }}>
-      {/* HEADER & NAVIGATION */}
-      <div style={{ marginBottom: 20 }}>
-        <Link href="/" style={{ 
-          color: "var(--foreground)", 
-          textDecoration: "none", 
-          display: "inline-flex", 
-          alignItems: "center", 
-          gap: 6, 
-          fontWeight: 700,
-          fontSize: 14,
-          padding: "8px 12px",
-          background: "rgba(255,255,255,0.05)",
-          borderRadius: 12,
-          border: "1px solid var(--border)"
-        }}>
-          <ChevronLeft size={16} /> Dashboard
+    <main style={{ padding: 18, maxWidth: 720, margin: "0 auto", fontFamily: "system-ui" }}>
+      <div style={{ marginBottom: 12 }}>
+        <Link href="/" style={{ color: "var(--foreground)", textDecoration: "none", display: "flex", alignItems: "center", gap: 4, fontWeight: 600 }}>
+          <ChevronLeft size={16} /> Back
         </Link>
       </div>
 
-      {/* SAFETY DISCLAIMER */}
-      <div style={{ 
-        display: "inline-flex", 
-        alignItems: "center", 
-        gap: 8,
-        padding: "8px 16px", 
-        marginBottom: 24, 
-        fontSize: 11, 
-        fontWeight: 900, 
-        textTransform: "uppercase", 
-        background: "rgba(0,0,0,0.05)", 
-        borderRadius: 10, 
-        color: "var(--muted)", 
-        border: "1px solid var(--border)",
-        letterSpacing: "0.05em"
-      }}>
-        <ShieldCheck size={14} className="text-amber-500" />
+      <p style={{ display: "inline-block", padding: "6px 12px", marginBottom: 12, fontSize: 11, fontWeight: 800, textTransform: "uppercase", background: "rgba(0,0,0,0.05)", borderRadius: 6, color: "var(--muted)", border: "1px solid var(--border)" }}>
         Reference only — not for real-world navigation.
-      </div>
+      </p>
 
-      <div style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: 56, margin: "0 0 4px", fontWeight: 900, letterSpacing: "-0.04em", lineHeight: 1 }}>
-          {airport.ident}
-        </h1>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <p style={{ margin: 0, fontSize: 24, color: "var(--muted)", fontWeight: 600 }}>{airport.name}</p>
-          {airport.iata_code && <Badge text={airport.iata_code} tone="muted" />}
-        </div>
-      </div>
+      <h1 style={{ fontSize: 44, margin: "8px 0 2px", fontWeight: 800 }}>{airport.ident}</h1>
+      <p style={{ margin: 0, fontSize: 20, color: "var(--muted)", fontWeight: 600 }}>{airport.name}</p>
 
-      <div style={{ display: "grid", gap: 20 }}>
-        {/* AIRPORT INFO */}
-        <Card title="Technical Specs" icon={Database}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "0 40px" }}>
-            <div>
-              <KV k="ICAO Identifier" v={airport.ident} />
-              <KV k="IATA Code" v={airport.iata_code || "None"} />
-              <KV k="Airport Type" v={airport.type.replace('_', ' ')} />
-            </div>
-            <div>
-              <KV k="Municipality" v={airport.municipality} />
-              <KV k="Elevation" v={`${fmtFt(airport.elevation_ft)} (${fmtMFromFt(airport.elevation_ft)})`} />
-              <KV k="Country" v={
-                <Link href={`/countries/${airport.iso_country.toLowerCase()}`} style={{ 
-                  color: "var(--foreground)", 
-                  textDecoration: "underline",
-                  textUnderlineOffset: 4,
-                  display: "flex", 
-                  alignItems: "center", 
-                  gap: 6 
-                }}>
-                  <Globe size={14} className="text-blue-500" /> {airport.iso_country} {countryName ? `(${countryName})` : ""}
-                </Link>
-              } />
-            </div>
-          </div>
+      <div style={{ height: 24 }} />
+
+      <div style={{ display: "grid", gap: 14 }}>
+        <Card title="Airport Info">
+          <KV k="Name" v={airport.name} />
+          <KV k="Codes" v={`${airport.iata_code || "—"} / ${airport.ident}`} />
+          <KV k="Type" v={airport.type.replace('_', ' ')} />
+          <KV k="City" v={airport.municipality} />
+          <KV k="Country" v={
+            <Link href={`/countries/${airport.iso_country.toLowerCase()}`} style={{ color: "var(--foreground)", fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
+              <Globe size={14} className="text-blue-500" /> {airport.iso_country}{countryName ? ` — ${countryName}` : ""}
+            </Link>
+          } />
+          <KV k="Elevation" v={`${fmtFt(airport.elevation_ft)} / ${fmtMFromFt(airport.elevation_ft)}`} />
         </Card>
 
-        {/* RUNWAYS */}
-        <Card title="Runways & Surfaces" icon={Plane}>
-          <div style={{ display: "grid", gap: 12 }}>
-            {runways.map((r: any) => (
-              <div key={r.id} style={{ 
-                border: "1px solid var(--border)", 
-                borderRadius: 20, 
-                padding: 20,
-                background: "rgba(255,255,255,0.02)"
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                  <span style={{ fontWeight: 900, fontSize: 22, letterSpacing: "-0.02em" }}>{r.le_ident} / {r.he_ident}</span>
-                  <Badge text={r.lighted ? "LIGHTED" : "UNLIT"} tone={r.lighted ? "ok" : "muted"} />
-                </div>
-                <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
-                  <div style={{ display: "flex", flexDirection: "column" }}>
-                    <span style={{ fontSize: 10, fontWeight: 800, color: "var(--muted)", textTransform: "uppercase" }}>Dimensions</span>
-                    <span style={{ fontWeight: 700 }}>{fmtFt(r.length_ft)} x {r.width_ft ? `${r.width_ft} ft` : "—"}</span>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column" }}>
-                    <span style={{ fontSize: 10, fontWeight: 800, color: "var(--muted)", textTransform: "uppercase" }}>Surface</span>
-                    <span style={{ fontWeight: 700 }}>{surfaceLabel(r.surface)}</span>
-                  </div>
-                </div>
+        <Card title="Key Facts">
+          <KV k="Coordinates" v={`${airport.latitude_deg.toFixed(4)}, ${airport.longitude_deg.toFixed(4)}`} />
+          <KV k="Wikipedia" v={airport.wikipedia_link ? <a href={airport.wikipedia_link} target="_blank" style={{ color: "var(--foreground)" }}>Open Article</a> : "—"} />
+          <KV k="Home Page" v={airport.home_link ? <a href={airport.home_link} target="_blank" style={{ color: "var(--foreground)" }}>Official Site</a> : "—"} />
+          {airport.keywords && <KV k="Tags" v={airport.keywords} />}
+        </Card>
+
+        <Card title="Runways">
+          {runways.map((r: any) => (
+            <div key={r.id} style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 12, marginBottom: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                <span style={{ fontWeight: 800, fontSize: 18 }}>{r.le_ident} / {r.he_ident}</span>
+                <Badge text={r.lighted ? "LIGHTED" : "UNLIT"} tone={r.lighted ? "ok" : "muted"} />
               </div>
-            ))}
-          </div>
-        </Card>
-
-        {/* FREQUENCIES */}
-        <Card title="Radio Frequencies" icon={Activity}>
-          <div style={{ display: "grid", gap: 2 }}>
-            {frequencies.length > 0 ? frequencies.map((f: any) => (
-              <div key={f.id} style={{ 
-                display: "flex", 
-                justifyContent: "space-between", 
-                alignItems: "center",
-                padding: "12px 0", 
-                borderBottom: "1px solid rgba(255,255,255,0.05)" 
-              }}>
-                <div style={{ display: "flex", flexDirection: "column" }}>
-                  <span style={{ fontWeight: 800, fontSize: 15 }}>{f.type}</span>
-                  <span style={{ color: "var(--muted)", fontSize: 12, fontWeight: 600 }}>{f.description}</span>
-                </div>
-                <div style={{ fontWeight: 900, fontSize: 16, fontFamily: "monospace", color: "#3b82f6" }}>
-                  {fmtFreqMHz(f.frequency_mhz)}
-                </div>
+              <div style={{ color: "var(--muted)", fontWeight: 600, fontSize: 14 }}>
+                {fmtFt(r.length_ft)} x {r.width_ft || "?"} ft
+                {" · "}
+                {surfaceLabel(r.surface)}
               </div>
-            )) : <p style={{ color: "var(--muted)", fontStyle: "italic", fontSize: 14 }}>No COM frequencies available.</p>}
-          </div>
+              {(r.le_heading_degt || r.he_heading_degt) && (
+                <div style={{ marginTop: 8, fontSize: 12, color: "var(--muted)" }}>
+                  Heading: {r.le_heading_degt ?? "—"}° / {r.he_heading_degt ?? "—"}°
+                </div>
+              )}
+            </div>
+          ))}
         </Card>
 
-        {/* NEARBY AIRPORTS */}
-        <Card title="Nearby Facilities" subtitle="Closest airports for alternates and regional planning." icon={MapPin}>
-          <div style={{ display: "grid", gap: 12 }}>
+        <Card title="Frequencies">
+          {frequencies.length > 0 ? frequencies.map((f: any) => (
+            <div key={f.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+              <div style={{ fontWeight: 700 }}>{f.type} <span style={{ color: "var(--muted)", fontWeight: 500, marginLeft: 8 }}>{f.description}</span></div>
+              <div style={{ fontWeight: 800 }}>{fmtFreqMHz(f.frequency_mhz)}</div>
+            </div>
+          )) : <p style={{ color: "var(--muted)", fontStyle: "italic" }}>No frequencies found.</p>}
+        </Card>
+
+        <Card title="Nearby Airports" subtitle="Direct distance for planning alternates.">
+          <div style={{ display: "grid", gap: 10 }}>
             {nearby.map((nb: any) => (
-              <Link key={nb.ident} href={`/airports/${nb.ident}`} style={{ 
-                textDecoration: "none", 
-                color: "inherit", 
-                display: "flex", 
-                justifyContent: "space-between", 
-                alignItems: "center", 
-                padding: "16px", 
-                background: "rgba(255,255,255,0.03)", 
-                borderRadius: 20, 
-                border: "1px solid var(--border)",
-                transition: "transform 0.2s"
-              }} className="hover-card">
-                <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                  <div style={{ 
-                    width: 44, 
-                    height: 44, 
-                    borderRadius: 12, 
-                    background: "rgba(0,0,0,0.05)", 
-                    display: "flex", 
-                    alignItems: "center", 
-                    justifyContent: "center",
-                    flexShrink: 0 
-                  }}>
+              <Link key={nb.ident} href={`/airports/${nb.ident}`} style={{ textDecoration: "none", color: "inherit", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px", background: "rgba(255,255,255,0.03)", borderRadius: 14, border: "1px solid var(--border)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(0,0,0,0.03)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                     {getIcon(nb.type)}
                   </div>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 900, display: "flex", alignItems: "center", gap: 8, fontSize: 16 }}>
+                    <div style={{ fontWeight: 800, display: "flex", alignItems: "center", gap: 6 }}>
                       {nb.ident}
                       {nb.has_ils && (
-                        <span style={{ 
-                          fontSize: 9, 
-                          fontWeight: 900, 
-                          background: "rgba(16,185,129,0.15)", 
-                          color: "#10b981", 
-                          padding: "2px 6px", 
-                          borderRadius: 6, 
-                          border: "1px solid rgba(16,185,129,0.2)" 
-                        }}>ILS</span>
+                        <span style={{ fontSize: 9, fontWeight: 900, background: "rgba(16,185,129,0.1)", color: "#10b981", padding: "2px 5px", borderRadius: 4, border: "1px solid rgba(16,185,129,0.2)" }}>ILS</span>
                       )}
                     </div>
-                    <div style={{ 
-                      fontSize: 13, 
-                      color: "var(--muted)", 
-                      fontWeight: 600, 
-                      overflow: "hidden", 
-                      textOverflow: "ellipsis", 
-                      whiteSpace: "nowrap" 
-                    }}>{nb.name}</div>
+                    <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nb.name}</div>
                   </div>
                 </div>
-                <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 12 }}>
-                  <div style={{ fontSize: 14, fontWeight: 900, color: "var(--foreground)" }}>{Math.round(nb.dist)} km</div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)" }}>{Math.round(nb.dist * 0.54)} nm</div>
+                <div style={{ textAlign: "right", fontSize: 13, fontWeight: 700, flexShrink: 0, marginLeft: 10 }}>
+                  {Math.round(nb.dist)} km
                 </div>
               </Link>
             ))}
           </div>
         </Card>
 
-        {/* FOOTER */}
-        <footer style={{ 
-          padding: "40px 0", 
-          textAlign: "center", 
-          borderTop: "1px solid var(--border)", 
-          marginTop: 20 
-        }}>
-          <p style={{ fontSize: 12, color: "var(--muted)", margin: 0, lineHeight: 1.8, fontWeight: 600 }}>
-            Airport Data: <strong style={{ color: "var(--foreground)" }}>OurAirports</strong> (Public Domain) <br />
-            ILS & Approach Data: <strong style={{ color: "var(--foreground)" }}>{ilsSource}</strong> · Verified AIP Cycle 2026 <br />
-            <span style={{ color: "var(--foreground)", fontWeight: 800 }}>Reference only — not for real-world navigation.</span>
+        <div style={{ padding: "30px 10px", textAlign: "center", borderTop: "1px solid var(--border)", marginTop: 20 }}>
+          <p style={{ fontSize: 12, color: "var(--muted)", margin: 0, lineHeight: 1.6 }}>
+            Base Airport Data: <strong style={{color: "var(--foreground)"}}>OurAirports</strong> (Public Domain) <br />
+            Instrument Approach Data: <strong style={{color: "var(--foreground)"}}>{ilsSource}</strong> · 
+            Cycle: <strong style={{color: "var(--foreground)"}}>{ilsUpdated}</strong> <br />
+            <strong>Reference only — not for real-world navigation.</strong>
           </p>
-        </footer>
+        </div>
       </div>
     </main>
   );
