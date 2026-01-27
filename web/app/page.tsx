@@ -16,7 +16,9 @@ import {
   ChevronRight, 
   Database,
   Info,
-  Server
+  Server,
+  ExternalLink,
+  Navigation
 } from "lucide-react";
 
 export const runtime = "nodejs";
@@ -28,11 +30,11 @@ const SITE_URL = "https://www.airportlookup.com";
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Professional MSFS 2024 Airport Database — Verified ILS & FAA Data",
+    default: "Professional MSFS 2024 Airport Database — 40,000+ Verified Hubs",
     template: "%s · Airport Lookup",
   },
   description:
-    "The ultimate technical reference for Microsoft Flight Simulator 2024. 40,000+ airports, 3,000+ verified ILS frequencies, and official FAA NASR data.",
+    "The ultimate flight simulator reference. 40,000+ airports, 3,000+ verified ILS frequencies from official FAA and AIP 2026 sources for MSFS 2024 and X-Plane.",
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",
@@ -43,8 +45,6 @@ export const metadata: Metadata = {
   },
   robots: { index: true, follow: true },
 };
-
-/* ----------------------------- CONSTANTS ----------------------------- */
 
 const GLOBAL_HUBS = [
   { code: "KJFK", label: "New York", type: "large_airport", has_ils: true },
@@ -119,13 +119,13 @@ export default async function Home() {
     <main className="mx-auto w-full max-w-5xl px-4 py-10">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
-      {/* Hero Section */}
+      {/* Hero Section - Der Database Flex */}
       <section className="mb-10">
         <h1 className="text-5xl font-extrabold tracking-tight text-neutral-900 dark:text-neutral-100 mb-6">
           The Professional MSFS Airport Database
         </h1>
         
-        {/* DATABASE STATS FLEX BAR - Zeigt unsere Power sofort an */}
+        {/* STATS BAR: Zeigt sofort unsere Daten-Macht */}
         <div className="flex flex-wrap gap-3 mb-8">
           <div className="flex items-center gap-2 px-4 py-2 bg-blue-500/5 border border-blue-500/20 rounded-xl">
             <Server className="w-4 h-4 text-blue-600" />
@@ -145,32 +145,32 @@ export default async function Home() {
         </div>
 
         <p className="text-xl text-neutral-700 dark:text-neutral-300 leading-relaxed max-w-3xl">
-          Search the world's most accurate technical reference for <strong>Microsoft Flight Simulator 2024</strong>. 
-          Featuring <strong>official FAA data</strong> for the USA and 2026 AIP researched international records. 
-          The go-to tool for real-time runway lighting, nav-aids, and approach frequencies.
+          Search the most accurate technical reference for <strong>Microsoft Flight Simulator 2024</strong>. 
+          Powered by <strong>official FAA NASR cycles</strong> for the USA and 2026 AIP researched international records. 
+          The ultimate tool for runway lighting, nav-aids, and approach frequencies.
         </p>
-        
-        <p className="mt-6 inline-block px-3 py-1.5 text-[10px] font-black tracking-[0.2em] uppercase bg-neutral-100 dark:bg-neutral-800 text-neutral-500 rounded-md border border-neutral-200 dark:border-neutral-700 shadow-sm">
-          Reference only — not for real-world navigation.
+
+        <p className="mt-6 inline-block px-3 py-1.5 text-[10px] font-black tracking-[0.2em] uppercase bg-neutral-100 dark:bg-neutral-800 text-neutral-500 rounded-md border border-neutral-200 dark:border-neutral-700">
+          Flight Sim Use Only — Not for Real World Navigation
         </p>
       </section>
 
-      {/* Search & Hubs Card */}
+      {/* Search Card */}
       <section className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-8 shadow-xl shadow-blue-500/5 mb-10">
         <AirportSearch />
         
         <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-neutral-100 dark:border-neutral-800">
           <p className="text-xs text-neutral-500 leading-relaxed">
-            Our database includes <strong>comprehensive coverage of the United States</strong> via official FAA NASR cycles, 
-            ensuring every localized runway and frequency is simulation-ready for your next IFR flight.
+            Our data includes <strong>verified US coverage</strong> from official FAA datasets. Every runway length, 
+            identifier, and ILS frequency is cross-checked for simulation accuracy.
           </p>
           <p className="text-xs text-neutral-500 leading-relaxed">
-            International hubs are updated via researched <strong>AIP 2026</strong> datasets, 
-            providing verified ILS identifiers and lighting configurations for global MSFS 2024 operations.
+            International airports are continuously updated using researched <strong>AIP 2026</strong> international records, 
+            supporting your global IFR operations in MSFS and X-Plane.
           </p>
         </div>
 
-        {/* Global Examples with Icons & ILS Badges */}
+        {/* Popular Searches */}
         <div className="mt-10">
           <div className="flex items-center gap-2 mb-4 text-xs font-bold uppercase tracking-widest text-neutral-500">
             <Globe className="w-3 h-3" /> Worldwide Hubs & Popular Searches
@@ -202,26 +202,56 @@ export default async function Home() {
 
       <NearbyAirports />
 
+      {/* Professional Briefing Tools - Die SkyVector & FlightAware Sektion */}
+      <section className="mt-16 bg-blue-600/5 border border-blue-500/10 rounded-3xl p-8 mb-12">
+        <div className="flex items-center gap-3 mb-6">
+          <Navigation className="w-6 h-6 text-blue-600" />
+          <h2 className="text-2xl font-bold">Professional Briefing Toolbox</h2>
+        </div>
+        <div className="grid gap-6 md:grid-cols-2">
+          <div className="space-y-4">
+            <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
+              We provide direct integration with the world's leading aviation resources to ensure you have 
+              every chart and live update required for a successful flight.
+            </p>
+            <div className="flex flex-wrap gap-4">
+               <a href="https://skyvector.com" target="_blank" className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:underline">
+                 SkyVector Charts <ExternalLink className="w-3 h-3" />
+               </a>
+               <a href="https://flightaware.com" target="_blank" className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:underline">
+                 FlightAware Live <ExternalLink className="w-3 h-3" />
+               </a>
+            </div>
+          </div>
+          <div className="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-2xl p-5 shadow-sm">
+             <h4 className="font-bold text-xs uppercase tracking-widest text-neutral-400 mb-3">Briefing Value</h4>
+             <ul className="text-xs space-y-2 text-neutral-600 dark:text-neutral-400">
+               <li className="flex items-start gap-2 italic">"Use SkyVector for VFR/IFR planning and FlightAware to check real-world runway usage before takeoff."</li>
+             </ul>
+          </div>
+        </div>
+      </section>
+
       {/* Feature Value Props */}
-      <section className="mt-16 grid gap-6 md:grid-cols-3 mb-12">
+      <section className="grid gap-6 md:grid-cols-3 mb-16">
         <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 hover:shadow-lg transition-shadow">
           <Zap className="w-6 h-6 text-emerald-500 mb-3" />
           <h3 className="font-bold text-neutral-900 dark:text-white">Runway & ILS</h3>
-          <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
+          <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
             Get accurate lengths, surfaces, and <strong>verified 2026 ILS frequencies</strong> for precision landings in MSFS 2024.
           </p>
         </div>
         <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 hover:shadow-lg transition-shadow">
           <Radio className="w-6 h-6 text-blue-500 mb-3" />
           <h3 className="font-bold text-neutral-900 dark:text-white">Global Comms</h3>
-          <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
+          <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
             Quickly find TWR, GND, and ATIS frequencies for over 40,000 airports worldwide.
           </p>
         </div>
         <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 hover:shadow-lg transition-shadow">
           <Map className="w-6 h-6 text-amber-500 mb-3" />
           <h3 className="font-bold text-neutral-900 dark:text-white">Navaids</h3>
-          <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
+          <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
             Full coverage of VOR, NDB, and DME stations with verified frequencies and coordinates.
           </p>
         </div>
