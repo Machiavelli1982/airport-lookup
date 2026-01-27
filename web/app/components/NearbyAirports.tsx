@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Plane, Navigation, Home, Wind, MapPin, Loader2 } from "lucide-react";
+import { Plane, Helicopter, MapPin, Loader2 } from "lucide-react";
 
 type NearbyItem = {
   icao: string;
@@ -11,7 +11,7 @@ type NearbyItem = {
   municipality?: string;
   type: string;
   distance_km?: number;
-  has_ils: boolean; // Neu: Für die Anzeige des ILS-Badges
+  has_ils: boolean;
 };
 
 export default function NearbyAirports() {
@@ -19,19 +19,19 @@ export default function NearbyAirports() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Icon & Label Logik für maximale Klarheit
-  const getTypeInfo = (type: string) => {
+  // Einheitliche Icon-Logik (identisch mit AirportSearch)
+  const getAirportIcon = (type: string) => {
     switch (type) {
-      case "large_airport": 
-        return { icon: <Plane className="w-5 h-5 text-blue-600" />, label: "Large Airport" };
-      case "medium_airport": 
-        return { icon: <Plane className="w-4 h-4 text-emerald-600" />, label: "Medium Airport" };
-      case "small_airport": 
-        return { icon: <Navigation className="w-4 h-4 text-amber-600" />, label: "Small Airfield" };
-      case "heliport": 
-        return { icon: <Wind className="w-4 h-4 text-purple-600" />, label: "Heliport" };
-      default: 
-        return { icon: <Home className="w-4 h-4 text-neutral-500" />, label: "Airport" };
+      case "large_airport":
+        return { icon: <Plane className="w-5 h-5 text-blue-600 shrink-0" />, label: "Large Airport" };
+      case "medium_airport":
+        return { icon: <Plane className="w-4 h-4 text-emerald-600 shrink-0" />, label: "Medium Airport" };
+      case "small_airport":
+        return { icon: <Plane className="w-3.5 h-3.5 text-amber-600 shrink-0" />, label: "Small Airfield" };
+      case "heliport":
+        return { icon: <Helicopter className="w-4 h-4 text-purple-600 shrink-0" />, label: "Heliport" };
+      default:
+        return { icon: <Plane className="w-4 h-4 text-neutral-400 shrink-0" />, label: "Airport" };
     }
   };
 
@@ -91,7 +91,7 @@ export default function NearbyAirports() {
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((item) => {
-          const { icon, label } = getTypeInfo(item.type);
+          const { icon, label } = getAirportIcon(item.type);
           
           return (
             <Link 
@@ -100,14 +100,15 @@ export default function NearbyAirports() {
               className="group flex items-center justify-between p-4 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-lg transition-all"
             >
               <div className="flex items-center gap-3 overflow-hidden">
-                <div className="flex-shrink-0 p-2 bg-neutral-50 dark:bg-neutral-800 rounded-lg group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 transition-colors">
+                {/* Zentrierter Icon-Container für sauberen Look */}
+                <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-neutral-50 dark:bg-neutral-800 rounded-xl group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 transition-colors">
                   {icon}
                 </div>
+                
                 <div className="overflow-hidden">
                   <div className="font-bold text-sm text-neutral-900 dark:text-white truncate flex items-center gap-2">
                     {item.icao} {item.iata ? `/ ${item.iata}` : ""}
                     
-                    {/* SEO ILS Badge */}
                     {item.has_ils && (
                       <span className="text-[9px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-1 py-0.5 rounded leading-none uppercase tracking-tighter shrink-0">
                         ILS
@@ -119,9 +120,10 @@ export default function NearbyAirports() {
                   </div>
                 </div>
               </div>
+              
               {item.distance_km && (
                 <div className="text-right flex-shrink-0 ml-2">
-                  <div className="text-[10px] font-black text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded-md">
+                  <div className="text-[10px] font-black text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded-md shadow-sm">
                     {item.distance_km.toFixed(1)} km
                   </div>
                 </div>
