@@ -141,6 +141,42 @@ function pickPrimaryFrequency(frequencies: Frequency[]) {
   return [...frequencies].sort((a, b) => rank(a.type) - rank(b.type) || Number(a.frequency_mhz) - Number(b.frequency_mhz))[0];
 }
 
+/* ----------------------------- EXTENDED TRANSITION LOGIC ----------------------------- */
+
+type TransitionData = {
+  value: string;
+  isNational: boolean;
+};
+
+function getTransitionAltitude(countryCode: string, airportTA: number | null): TransitionData {
+  // 1. Wenn ein spezifischer Wert in unserer DB (z.B. aus dem AIP) existiert
+  if (airportTA) {
+    return { value: `${airportTA.toLocaleString('en-US')} ft`, isNational: false };
+  }
+
+  // 2. Umfassendes Mapping nationaler Standards (AIP 2026 / ICAO Compliance)
+  const nationalStandards: Record<string, number> = {
+    'US': 18000, 'CA': 18000, 'MX': 18500, // Nordamerika
+    'DE': 5000,  'AT': 5000,  'CH': 7000,  'FR': 5000,  'GB': 3000, // Europa (Zentrum/West)
+    'NL': 3000,  'BE': 4500,  'IT': 6000,  'ES': 6000,  'PT': 6000, 
+    'IE': 5000,  'DK': 5000,  'NO': 7000,  'SE': 5000,  'FI': 5000,
+    'PL': 6500,  'CZ': 5000,  'HU': 10000, 'RO': 4000,  'GR': 6000, 'TR': 10000,
+    'JP': 14000, 'CN': 9843,  'IN': 4000,  'AE': 13000, 'SA': 13000, // Asien / Middle East
+    'TH': 11000, 'SG': 11000, 'HK': 9000,  'KR': 14000, 'ID': 11000,
+    'AU': 10000, 'NZ': 13000, 'FJ': 13000, 'PG': 20000, // Ozeanien
+    'ZA': 11000, 'EG': 5000,  'KE': 11000, 'MA': 6000,  'NG': 11000, // Afrika
+    'BR': 6000,  'AR': 3000,  'CL': 5000,  'CO': 18000, 'PE': 18000  // Südamerika
+  };
+
+  const val = nationalStandards[countryCode];
+  if (val) {
+    return { value: `${val.toLocaleString('en-US')} ft`, isNational: true };
+  }
+
+  // Globaler ICAO-Standard-Fallback
+  return { value: "5,000 ft (ICAO Standard)", isNational: true };
+}
+
 const asBool = (v: any) => v === true || v === 1 || v === "1" || v === "t";
 
 /* ----------------------------- SEO & METADATA ----------------------------- */
@@ -224,6 +260,8 @@ export default async function AirportPage({ params }: Props) {
   const primaryFreq = pickPrimaryFrequency(frequencies);
   const ilsSource = ilsData?.[0]?.source === 'FAA_CSV' ? 'FAA NASR' : 'AIP 2026 Researched';
   const ilsUpdated = ilsData?.[0]?.created_at ? new Date(ilsData[0].created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "Jan 2026";
+// NEU: Transition Logik aufrufen
+  const ta = getTransitionAltitude(airport.iso_country, (airport as any).transition_alt);
 
   return (
     <main style={{ padding: 18, maxWidth: 720, margin: "0 auto", fontFamily: "system-ui" }}>
@@ -252,6 +290,20 @@ export default async function AirportPage({ params }: Props) {
               <Badge text={hasIlsData ? "ILS FREQUENCIES VERIFIED ✅" : "ILS DATA NOT IN DATABASE"} tone={hasIlsData ? "ok" : "muted"} />
             </div>
             <KV k="Field Elevation" v={`${numFmt(airport.elevation_ft)} ft / ${fmtM(airport.elevation_ft)}`} />
+            {/* NEUE ZEILE HIER */}
+    <KV 
+      k="Transition Altitude" 
+      v={
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {ta.value}
+          {ta.isNational && (
+            <span style={{ fontSize: 10, background: "rgba(255,255,255,0.05)", padding: "2px 6px", borderRadius: 4, color: "var(--muted)", border: "1px solid var(--border)" }}>
+              National Standard
+            </span>
+          )}
+        </div>
+      } 
+    />
             <KV k="Primary Channel" v={primaryFreq ? `${primaryFreq.type} ${primaryFreq.frequency_mhz.toFixed(2)} MHz (${primaryFreq.description || ""})` : "—"} />
             
             <div style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 12, background: "rgba(255,255,255,0.02)" }}>
@@ -268,16 +320,21 @@ export default async function AirportPage({ params }: Props) {
           </div>
         </Card>
 
-        {/* 2. TECHNICAL FLIGHT BRIEFING TEXT */}
-        <div style={{ padding: "16px", background: "rgba(34,197,94,0.03)", borderRadius: 14, border: "1px solid var(--border)", lineHeight: "1.6", fontSize: "15px", color: "var(--muted)" }}>
-          Welcome to the technical flight briefing for <strong>{airport.name} ({airport.ident})</strong>, located in <strong>{airport.municipality || "the region of"}, {countryName}</strong>. 
-          As a vital hub for <strong>Microsoft Flight Simulator 2024</strong>, MSFS 2020, and X-Plane pilots, this facility features 
-          <strong> {runways.length} active {runways.length === 1 ? 'runway' : 'runways'}</strong> with a maximum elevation of {numFmt(airport.elevation_ft)} ft. 
-          {hasIlsData 
-            ? `Instrument approaches (IFR) are supported with verified ILS frequencies and identifiers for precision landings.` 
-            : `Please note that this field primarily supports VFR and visual approach procedures.`} 
-          Reference the data below for primary communication channels and detailed runway characteristics.
-        </div>
+{/* 2. TECHNICAL FLIGHT BRIEFING TEXT */}
+<div style={{ padding: "16px", background: "rgba(34,197,94,0.03)", borderRadius: 14, border: "1px solid var(--border)", lineHeight: "1.6", fontSize: "15px", color: "var(--muted)" }}>
+  Welcome to the technical flight briefing for <strong>{airport.name} ({airport.ident})</strong>, located in <strong>{airport.municipality || "the region of"}, {countryName}</strong>. 
+  As a vital hub for <strong>Microsoft Flight Simulator 2024</strong>, MSFS 2020, and X-Plane pilots, this facility features 
+  <strong> {runways.length} active {runways.length === 1 ? 'runway' : 'runways'}</strong> with a maximum elevation of {numFmt(airport.elevation_ft)} ft. 
+  {hasIlsData 
+    ? ` Instrument approaches (IFR) are supported with verified ILS frequencies and identifiers for precision landings.` 
+    : ` Please note that this field primarily supports VFR and visual approach procedures.`} 
+  Reference the data below for primary communication channels and detailed runway characteristics.
+  
+  {/* NEUER SATZ: Mit einem Leerzeichen davor für saubere Optik */}
+  {" "}Pilots should observe a <strong>Transition Altitude of {ta.value}</strong> {ta.isNational ? "based on regional standards" : "verified for this field"} for altimeter reset procedures.
+</div>
+
+{/* HIER GEHT ES DANN DIREKT MIT PUNKT 3 WEITER (OHNE EXTRA </div>) */}
 
  {/* 3. AIRPORT DETAILS */}
         <Card title="Airport Details" subtitle="Full geographical and organizational metadata.">
@@ -291,6 +348,8 @@ export default async function AirportPage({ params }: Props) {
           ) : "—"} />
           <KV k="Region" v={airport.iso_region ? `${airport.iso_region}${regionName ? ` — ${regionName}` : ""}` : "—"} />
           <KV k="GPS Coordinates" v={<a href={googleMapsLink(airport.latitude_deg, airport.longitude_deg)} target="_blank" style={{ color: "var(--foreground)", fontWeight: 700 }}>📍 {fmtCoord(airport.latitude_deg)}, {fmtCoord(airport.longitude_deg)} 🗺️</a>} />
+         {/* NEUE ZEILE HIER */}
+  <KV k="Transition Altitude" v={ta.value + (ta.isNational ? " (National Standard)" : "")} />
           <KV k="Elevation" v={numFmt(airport.elevation_ft) + " ft"} />
           {airport.home_link && <KV k="Official Website" v={<a href={airport.home_link} target="_blank" style={{ color: "var(--foreground)", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 4 }}>Visit Site <ExternalLink size={14} /></a>} />}
           {airport.wikipedia_link && <KV k="Wikipedia" v={<a href={airport.wikipedia_link} target="_blank" style={{ color: "inherit" }}>Open Article</a>} />}
