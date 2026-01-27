@@ -1,3 +1,4 @@
+// web/scripts/import-faa-approaches.mjs
 import { config } from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -9,7 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const envPath = path.resolve(__dirname, '../.env.local');
 config({ path: envPath });
 
-// 2. Datenbank dynamisch importieren
+// 2. Datenbank dynamisch importieren (verhindert Fehler, wenn env noch nicht geladen ist)
 const { sql } = await import('../lib/db.ts');
 
 // AKTUELLER ZYKLUS JANUAR 2026
@@ -40,20 +41,28 @@ async function importFAA() {
     for (const state of digital_tpp.state_code) {
       for (const city of state.city_name) {
         for (const airport of city.airport_name) {
-          const ident = airport.$.ID; 
-          const icao = airport.$.icao; 
+          // FIX: Zugriff auf XML-Attribute über .$
+          const faaId = airport.$?.ID; // Der FAA Identifier (z.B. JFK)
+          const icao = airport.$?.icao; // Der ICAO Code (z.B. KJFK)
           
+          // Falls kein Ident vorhanden ist, überspringen
+          if (!faaId && !icao) continue;
+
           if (airport.record) {
             for (const record of airport.record) {
               const type = record.chart_code[0];
               const name = record.chart_name[0];
               const pdfName = record.pdf_name[0];
-              // Konstruktion der PDF-URL für 2026
+              
+              // Konstruktion der PDF-URL
               const chartUrl = `https://aeronav.faa.gov/d-tpp/${CYCLE}/${pdfName}`;
+
+              // Wir nutzen bevorzugt den ICAO-Code (KJFK) für deine DB-Struktur
+              const airportIdent = icao || faaId;
 
               await sql`
                 INSERT INTO airport_approaches (airport_ident, procedure_name, procedure_type, chart_url)
-                VALUES (${icao || ident}, ${name}, ${type}, ${chartUrl})
+                VALUES (${airportIdent}, ${name}, ${type}, ${chartUrl})
                 ON CONFLICT DO NOTHING
               `;
               count++;
@@ -62,7 +71,7 @@ async function importFAA() {
         }
       }
     }
-    console.log(`✅ Fertig! ${count} Prozeduren für 2026 importiert.`);
+    console.log(`✅ Fertig! ${count} Prozeduren mit korrekten Identifiern importiert.`);
   } catch (error) {
     console.error("❌ Fehler beim Import:", error.message);
   } finally {
