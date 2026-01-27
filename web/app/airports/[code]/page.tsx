@@ -279,7 +279,7 @@ export default async function AirportPage({ params }: Props) {
           Reference the data below for primary communication channels and detailed runway characteristics.
         </div>
 
-        {/* 3. AIRPORT DETAILS */}
+ {/* 3. AIRPORT DETAILS */}
         <Card title="Airport Details" subtitle="Full geographical and organizational metadata.">
           <KV k="Full Name" v={airport.name} />
           <KV k="ICAO / IATA" v={`${airport.ident} / ${airport.iata_code || "—"}`} />
@@ -291,6 +291,7 @@ export default async function AirportPage({ params }: Props) {
           ) : "—"} />
           <KV k="Region" v={airport.iso_region ? `${airport.iso_region}${regionName ? ` — ${regionName}` : ""}` : "—"} />
           <KV k="GPS Coordinates" v={<a href={googleMapsLink(airport.latitude_deg, airport.longitude_deg)} target="_blank" style={{ color: "var(--foreground)", fontWeight: 700 }}>📍 {fmtCoord(airport.latitude_deg)}, {fmtCoord(airport.longitude_deg)} 🗺️</a>} />
+          <KV k="Elevation" v={numFmt(airport.elevation_ft) + " ft"} />
           {airport.home_link && <KV k="Official Website" v={<a href={airport.home_link} target="_blank" style={{ color: "var(--foreground)", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 4 }}>Visit Site <ExternalLink size={14} /></a>} />}
           {airport.wikipedia_link && <KV k="Wikipedia" v={<a href={airport.wikipedia_link} target="_blank" style={{ color: "inherit" }}>Open Article</a>} />}
         </Card>
