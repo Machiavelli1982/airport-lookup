@@ -15,21 +15,24 @@ import {
   Map, 
   ChevronRight, 
   Database,
-  Info
+  Info,
+  Server
 } from "lucide-react";
 
 export const runtime = "nodejs";
 
 const SITE_URL = "https://www.airportlookup.com";
 
+/* ----------------------------- SEO & METADATA ----------------------------- */
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Global MSFS 2024 Airport Lookup — Verified ILS, Runways & Navaids",
+    default: "Professional MSFS 2024 Airport Database — Verified ILS & FAA Data",
     template: "%s · Airport Lookup",
   },
   description:
-    "Fast technical reference for Microsoft Flight Simulator 2024. Verified FAA (USA) and researched AIP 2026 (Global) ILS frequencies, runway lighting, and radio comms.",
+    "The ultimate technical reference for Microsoft Flight Simulator 2024. 40,000+ airports, 3,000+ verified ILS frequencies, and official FAA NASR data.",
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",
@@ -41,7 +44,8 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-// Globale Hubs mit verifizierten ILS-Daten
+/* ----------------------------- CONSTANTS ----------------------------- */
+
 const GLOBAL_HUBS = [
   { code: "KJFK", label: "New York", type: "large_airport", has_ils: true },
   { code: "EDDF", label: "Frankfurt", type: "large_airport", has_ils: true },
@@ -64,12 +68,14 @@ const COUNTRY_HUB_MAP: Record<string, { code: string; label: string }> = {
   AU: { code: "YSSY", label: "Sydney" },
 };
 
+/* ------------------------------ MAIN PAGE ------------------------------- */
+
 export default async function Home() {
   const headerList = await headers();
   const countryCode = headerList.get("x-vercel-ip-country") || "US";
   const localHub = COUNTRY_HUB_MAP[countryCode] || COUNTRY_HUB_MAP["US"];
 
-  // Detaillierte Länder-Statistiken inklusive ILS-Anzahl
+  // Detaillierte Länder-Statistiken inklusive ILS-Anzahl für den SEO-Flex
   const countryStats = await sql`
     SELECT 
       c.code, 
@@ -114,41 +120,59 @@ export default async function Home() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       {/* Hero Section */}
-      <section className="mb-8">
-        <div className="flex items-center gap-2 mb-4">
-          <span className="bg-emerald-500/10 text-emerald-600 text-[10px] font-black px-2 py-1 rounded-md border border-emerald-500/20 uppercase tracking-widest">
-            FAA (US) & Researched AIP 2026 (Global)
-          </span>
-        </div>
-        
-        {/* DER WICHTIGE GRAUE DISCLAIMER BADGE */}
-        <p className="inline-block px-3 py-1.5 mb-6 text-[11px] font-bold tracking-widest uppercase bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 rounded-md border border-neutral-200 dark:border-neutral-700 shadow-sm">
-          Reference only — not for real-world navigation.
-        </p>
-
-        <h1 className="text-4xl font-extrabold tracking-tight text-neutral-900 dark:text-neutral-100">
-          Global MSFS Airport Lookup
+      <section className="mb-10">
+        <h1 className="text-5xl font-extrabold tracking-tight text-neutral-900 dark:text-neutral-100 mb-6">
+          The Professional MSFS Airport Database
         </h1>
-        <p className="mt-3 text-lg text-neutral-700 dark:text-neutral-300 leading-relaxed">
-          The essential <strong>flight simulator reference</strong> for pilots. Get instant access to 
-          runway data, lighting systems, and verified <strong>ILS frequencies</strong> (FAA for USA, researched AIP for Global) 
-          for over 40,000 airports. Optimized for <strong>MSFS 2024</strong>.
+        
+        {/* DATABASE STATS FLEX BAR - Zeigt unsere Power sofort an */}
+        <div className="flex flex-wrap gap-3 mb-8">
+          <div className="flex items-center gap-2 px-4 py-2 bg-blue-500/5 border border-blue-500/20 rounded-xl">
+            <Server className="w-4 h-4 text-blue-600" />
+            <span className="text-blue-600 font-black text-sm">40,000+</span>
+            <span className="text-blue-900/60 dark:text-blue-100/60 text-[10px] font-bold uppercase tracking-widest">Airports</span>
+          </div>
+          <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
+            <Zap className="w-4 h-4 text-emerald-600" />
+            <span className="text-emerald-600 font-black text-sm">3,000+</span>
+            <span className="text-emerald-900/60 dark:text-emerald-100/60 text-[10px] font-bold uppercase tracking-widest">Verified ILS</span>
+          </div>
+          <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/5 border border-amber-500/20 rounded-xl">
+            <Database className="w-4 h-4 text-amber-600" />
+            <span className="text-amber-600 font-black text-sm">Official FAA</span>
+            <span className="text-amber-900/60 dark:text-amber-100/60 text-[10px] font-bold uppercase tracking-widest">Data Source</span>
+          </div>
+        </div>
+
+        <p className="text-xl text-neutral-700 dark:text-neutral-300 leading-relaxed max-w-3xl">
+          Search the world's most accurate technical reference for <strong>Microsoft Flight Simulator 2024</strong>. 
+          Featuring <strong>official FAA data</strong> for the USA and 2026 AIP researched international records. 
+          The go-to tool for real-time runway lighting, nav-aids, and approach frequencies.
+        </p>
+        
+        <p className="mt-6 inline-block px-3 py-1.5 text-[10px] font-black tracking-[0.2em] uppercase bg-neutral-100 dark:bg-neutral-800 text-neutral-500 rounded-md border border-neutral-200 dark:border-neutral-700 shadow-sm">
+          Reference only — not for real-world navigation.
         </p>
       </section>
 
       {/* Search & Hubs Card */}
-      <section className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 shadow-sm mb-10">
+      <section className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-8 shadow-xl shadow-blue-500/5 mb-10">
         <AirportSearch />
         
-        <p className="mt-4 text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
-          Airport Lookup provides dual-source precision: Official <strong>FAA NASR</strong> for the United States 
-          and researched <strong>AIP 2026</strong> datasets for international hubs. 
-          Instant access to runway lighting badges, approach frequencies, and Nav-Aids.
-        </p>
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-neutral-100 dark:border-neutral-800">
+          <p className="text-xs text-neutral-500 leading-relaxed">
+            Our database includes <strong>comprehensive coverage of the United States</strong> via official FAA NASR cycles, 
+            ensuring every localized runway and frequency is simulation-ready for your next IFR flight.
+          </p>
+          <p className="text-xs text-neutral-500 leading-relaxed">
+            International hubs are updated via researched <strong>AIP 2026</strong> datasets, 
+            providing verified ILS identifiers and lighting configurations for global MSFS 2024 operations.
+          </p>
+        </div>
 
         {/* Global Examples with Icons & ILS Badges */}
-        <div className="mt-8">
-          <div className="flex items-center gap-2 mb-3 text-xs font-bold uppercase tracking-widest text-neutral-500">
+        <div className="mt-10">
+          <div className="flex items-center gap-2 mb-4 text-xs font-bold uppercase tracking-widest text-neutral-500">
             <Globe className="w-3 h-3" /> Worldwide Hubs & Popular Searches
           </div>
           <div className="flex flex-wrap gap-2">
@@ -178,23 +202,23 @@ export default async function Home() {
 
       <NearbyAirports />
 
-      {/* Feature Value Props & SEO Block */}
+      {/* Feature Value Props */}
       <section className="mt-16 grid gap-6 md:grid-cols-3 mb-12">
-        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6">
+        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 hover:shadow-lg transition-shadow">
           <Zap className="w-6 h-6 text-emerald-500 mb-3" />
           <h3 className="font-bold text-neutral-900 dark:text-white">Runway & ILS</h3>
           <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
-            Get accurate lengths, surfaces, and <strong>verified 2026 ILS frequencies</strong> for landings in MSFS 2024.
+            Get accurate lengths, surfaces, and <strong>verified 2026 ILS frequencies</strong> for precision landings in MSFS 2024.
           </p>
         </div>
-        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6">
+        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 hover:shadow-lg transition-shadow">
           <Radio className="w-6 h-6 text-blue-500 mb-3" />
           <h3 className="font-bold text-neutral-900 dark:text-white">Global Comms</h3>
           <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
             Quickly find TWR, GND, and ATIS frequencies for over 40,000 airports worldwide.
           </p>
         </div>
-        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6">
+        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 hover:shadow-lg transition-shadow">
           <Map className="w-6 h-6 text-amber-500 mb-3" />
           <h3 className="font-bold text-neutral-900 dark:text-white">Navaids</h3>
           <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
@@ -203,19 +227,10 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="mb-16 border-l-4 border-emerald-500 pl-6 py-2">
-          <h2 className="text-2xl font-bold mb-4">Precision Landing Data for MSFS</h2>
-          <p className="text-neutral-600 dark:text-neutral-400 leading-relaxed max-w-3xl">
-            From major global hubs like <strong>London Heathrow (EGLL)</strong> to small remote strips, our database provides 
-            the critical landing info required for a successful flight. We offer <strong>global coverage</strong> including 
-            verified 2026 ILS frequencies, lighting systems, and Navaids (VOR/NDB) for every virtual sky. 
-          </p>
-      </section>
-
       {/* Browse Airports by Country */}
       <section className="mt-16">
-        <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-neutral-900 dark:text-white">
-          <Map className="w-5 h-5 text-blue-500" /> Browse Airports by Country
+        <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 text-neutral-900 dark:text-white">
+          <Globe className="w-5 h-5 text-blue-500" /> Browse Global Hubs by Country
         </h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {countryStats.map((c) => (
@@ -252,21 +267,6 @@ export default async function Home() {
         <Link href="/countries" className="inline-flex items-center gap-1 mt-8 text-sm font-bold text-blue-600 hover:underline transition-all">
           View all countries and specialized regions <ChevronRight className="w-4 h-4" />
         </Link>
-      </section>
-
-      {/* Data Source Transparency & Disclaimer */}
-      <section className="mt-12 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-100/50 dark:bg-neutral-900/50 p-6">
-        <div className="flex items-center gap-2 mb-3">
-          <Database className="w-4 h-4 text-neutral-500" />
-          <h3 className="text-sm font-bold text-neutral-900 dark:text-white uppercase tracking-wider">
-            Data Sources & Verification
-          </h3>
-        </div>
-        <p className="text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed">
-          Our landing data is compiled from <strong>FAA NASR</strong> (USA) and researched 
-          <strong> AIP 2026</strong> international datasets (Global). 
-          Metadata provided via OurAirports. <strong>Reference only — not for real-world navigation.</strong>
-        </p>
       </section>
 
       {/* SEO Footer Links */}
