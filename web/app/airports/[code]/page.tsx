@@ -374,6 +374,7 @@ export default async function AirportPage({ params }: Props) {
                 </div>
                 <div style={{ color: "var(--muted)", fontWeight: 600, fontSize: 14, lineHeight: "1.6" }}>
                   <strong>Length:</strong> {numFmt(r.length_ft)} ft / {fmtM(r.length_ft)} <br />
+                  <strong>Width:</strong> {numFmt(r.width_ft)} ft / {fmtM(r.width_ft)} <br />
                   <strong>Surface:</strong> {surfaceLabel(r.surface)} <br />
                   <strong>Heading:</strong> {r.le_heading_degt ?? "—"}° / {r.he_heading_degt ?? "—"}°
                 </div>
