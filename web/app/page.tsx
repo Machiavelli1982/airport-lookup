@@ -68,14 +68,11 @@ const COUNTRY_HUB_MAP: Record<string, { code: string; label: string }> = {
   AU: { code: "YSSY", label: "Sydney" },
 };
 
-/* ------------------------------ MAIN PAGE ------------------------------- */
-
 export default async function Home() {
   const headerList = await headers();
   const countryCode = headerList.get("x-vercel-ip-country") || "US";
   const localHub = COUNTRY_HUB_MAP[countryCode] || COUNTRY_HUB_MAP["US"];
 
-  // Detaillierte Länder-Statistiken inklusive ILS-Anzahl für den SEO-Flex
   const countryStats = await sql`
     SELECT 
       c.code, 
@@ -119,13 +116,13 @@ export default async function Home() {
     <main className="mx-auto w-full max-w-5xl px-4 py-10">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
-      {/* Hero Section - Der Database Flex */}
+      {/* Hero Section */}
       <section className="mb-10">
         <h1 className="text-5xl font-extrabold tracking-tight text-neutral-900 dark:text-neutral-100 mb-6">
           The Professional MSFS Airport Database
         </h1>
         
-        {/* STATS BAR: Zeigt sofort unsere Daten-Macht */}
+        {/* STATS BAR */}
         <div className="flex flex-wrap gap-3 mb-8">
           <div className="flex items-center gap-2 px-4 py-2 bg-blue-500/5 border border-blue-500/20 rounded-xl">
             <Server className="w-4 h-4 text-blue-600" />
@@ -147,7 +144,6 @@ export default async function Home() {
         <p className="text-xl text-neutral-700 dark:text-neutral-300 leading-relaxed max-w-3xl">
           Search the most accurate technical reference for <strong>Microsoft Flight Simulator 2024</strong>. 
           Powered by <strong>official FAA NASR cycles</strong> for the USA and 2026 AIP researched international records. 
-          The ultimate tool for runway lighting, nav-aids, and approach frequencies.
         </p>
 
         <p className="mt-6 inline-block px-3 py-1.5 text-[10px] font-black tracking-[0.2em] uppercase bg-neutral-100 dark:bg-neutral-800 text-neutral-500 rounded-md border border-neutral-200 dark:border-neutral-700">
@@ -202,7 +198,7 @@ export default async function Home() {
 
       <NearbyAirports />
 
-      {/* Professional Briefing Tools - Die SkyVector & FlightAware Sektion */}
+      {/* Professional Briefing Toolbox */}
       <section className="mt-16 bg-blue-600/5 border border-blue-500/10 rounded-3xl p-8 mb-12">
         <div className="flex items-center gap-3 mb-6">
           <Navigation className="w-6 h-6 text-blue-600" />
@@ -211,10 +207,12 @@ export default async function Home() {
         <div className="grid gap-6 md:grid-cols-2">
           <div className="space-y-4">
             <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
-              We provide direct integration with the world's leading aviation resources to ensure you have 
-              every chart and live update required for a successful flight.
+              Access <strong>live METAR/TAF weather reports</strong>, real-world charts, and live traffic data for a complete pre-flight briefing.
             </p>
             <div className="flex flex-wrap gap-4">
+               <span className="flex items-center gap-2 text-sm font-bold text-blue-600">
+                 ☀️ Live METAR & TAF
+               </span>
                <a href="https://skyvector.com" target="_blank" className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:underline">
                  SkyVector Charts <ExternalLink className="w-3 h-3" />
                </a>
@@ -226,7 +224,7 @@ export default async function Home() {
           <div className="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-2xl p-5 shadow-sm">
              <h4 className="font-bold text-xs uppercase tracking-widest text-neutral-400 mb-3">Briefing Value</h4>
              <ul className="text-xs space-y-2 text-neutral-600 dark:text-neutral-400">
-               <li className="flex items-start gap-2 italic">"Use SkyVector for VFR/IFR planning and FlightAware to check real-world runway usage before takeoff."</li>
+               <li className="flex items-start gap-2 italic">"Use SkyVector for planning and FlightAware to check real-world runway usage."</li>
              </ul>
           </div>
         </div>
@@ -238,21 +236,21 @@ export default async function Home() {
           <Zap className="w-6 h-6 text-emerald-500 mb-3" />
           <h3 className="font-bold text-neutral-900 dark:text-white">Runway & ILS</h3>
           <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
-            Get accurate lengths, surfaces, and <strong>verified 2026 ILS frequencies</strong> for precision landings in MSFS 2024.
+            Get accurate lengths and <strong>verified 2026 ILS frequencies</strong> for MSFS 2024.
           </p>
         </div>
         <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 hover:shadow-lg transition-shadow">
           <Radio className="w-6 h-6 text-blue-500 mb-3" />
           <h3 className="font-bold text-neutral-900 dark:text-white">Global Comms</h3>
           <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
-            Quickly find TWR, GND, and ATIS frequencies for over 40,000 airports worldwide.
+            TWR, GND, and ATIS frequencies for over 40,000 airports worldwide.
           </p>
         </div>
         <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 hover:shadow-lg transition-shadow">
           <Map className="w-6 h-6 text-amber-500 mb-3" />
           <h3 className="font-bold text-neutral-900 dark:text-white">Navaids</h3>
           <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
-            Full coverage of VOR, NDB, and DME stations with verified frequencies and coordinates.
+            Full coverage of VOR, NDB, and DME stations with verified coordinates.
           </p>
         </div>
       </section>

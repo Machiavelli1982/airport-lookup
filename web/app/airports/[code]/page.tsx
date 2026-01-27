@@ -84,11 +84,11 @@ function fmtM(ft: number | null | undefined): string {
 }
 
 function googleMapsLink(lat: number, lon: number): string {
-  return `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+  return `https://www.google.com/maps?q=${lat},${lon}`;
 }
 
 function googleMapsSatellite(lat: number, lon: number): string {
-  return `https://www.google.com/maps/@${lat},${lon},15z/data=!3m1!1e3`;
+  return `https://www.google.com/maps?q=${lat},${lon}&t=k`;
 }
 
 function skyVectorLink(icao: string): string {
@@ -97,6 +97,15 @@ function skyVectorLink(icao: string): string {
 
 function flightAwareLink(icao: string): string {
   return `https://flightaware.com/resources/airport/${icao}`;
+}
+
+// NEU: Wetter Helpers fixiert
+function checkWxLink(icao: string): string {
+  return `https://www.checkwx.com/weather/${icao}`;
+}
+
+function metarTafLink(icao: string): string {
+  return `https://metar-taf.com/${icao}`;
 }
 
 function surfaceLabel(surface: string | null | undefined): string {
@@ -141,7 +150,9 @@ function pickPrimaryFrequency(frequencies: Frequency[]) {
   return [...frequencies].sort((a, b) => rank(a.type) - rank(b.type) || Number(a.frequency_mhz) - Number(b.frequency_mhz))[0];
 }
 
-/* ----------------------------- EXTENDED TRANSITION LOGIC ----------------------------- */
+const asBool = (v: any) => v === true || v === 1 || v === "1" || v === "t";
+
+/* ----------------------------- TRANSITION LOGIC ----------------------------- */
 
 type TransitionData = {
   value: string;
@@ -149,35 +160,17 @@ type TransitionData = {
 };
 
 function getTransitionAltitude(countryCode: string, airportTA: number | null): TransitionData {
-  // 1. Wenn ein spezifischer Wert in unserer DB (z.B. aus dem AIP) existiert
-  if (airportTA) {
-    return { value: `${airportTA.toLocaleString('en-US')} ft`, isNational: false };
-  }
-
-  // 2. Umfassendes Mapping nationaler Standards (AIP 2026 / ICAO Compliance)
+  if (airportTA) return { value: `${airportTA.toLocaleString('en-US')} ft`, isNational: false };
   const nationalStandards: Record<string, number> = {
-    'US': 18000, 'CA': 18000, 'MX': 18500, // Nordamerika
-    'DE': 5000,  'AT': 5000,  'CH': 7000,  'FR': 5000,  'GB': 3000, // Europa (Zentrum/West)
-    'NL': 3000,  'BE': 4500,  'IT': 6000,  'ES': 6000,  'PT': 6000, 
-    'IE': 5000,  'DK': 5000,  'NO': 7000,  'SE': 5000,  'FI': 5000,
-    'PL': 6500,  'CZ': 5000,  'HU': 10000, 'RO': 4000,  'GR': 6000, 'TR': 10000,
-    'JP': 14000, 'CN': 9843,  'IN': 4000,  'AE': 13000, 'SA': 13000, // Asien / Middle East
-    'TH': 11000, 'SG': 11000, 'HK': 9000,  'KR': 14000, 'ID': 11000,
-    'AU': 10000, 'NZ': 13000, 'FJ': 13000, 'PG': 20000, // Ozeanien
-    'ZA': 11000, 'EG': 5000,  'KE': 11000, 'MA': 6000,  'NG': 11000, // Afrika
-    'BR': 6000,  'AR': 3000,  'CL': 5000,  'CO': 18000, 'PE': 18000  // Südamerika
+    'US': 18000, 'CA': 18000, 'MX': 18500, 'DE': 5000, 'AT': 5000, 'CH': 7000, 'FR': 5000, 'GB': 6000,
+    'NL': 3000, 'BE': 4500, 'IT': 6000, 'ES': 6000, 'PT': 6000, 'IE': 5000, 'DK': 5000, 'NO': 7000,
+    'SE': 5000, 'FI': 5000, 'PL': 6500, 'CZ': 5000, 'HU': 10000, 'RO': 4000, 'GR': 6000, 'TR': 10000,
+    'JP': 14000, 'CN': 9843, 'IN': 4000, 'AE': 13000, 'SA': 13000, 'AU': 10000, 'NZ': 13000, 'ZA': 11000,
+    'BR': 6000, 'AR': 3000, 'CL': 5000, 'CO': 18000
   };
-
   const val = nationalStandards[countryCode];
-  if (val) {
-    return { value: `${val.toLocaleString('en-US')} ft`, isNational: true };
-  }
-
-  // Globaler ICAO-Standard-Fallback
-  return { value: "5,000 ft (ICAO Standard)", isNational: true };
+  return val ? { value: `${val.toLocaleString('en-US')} ft`, isNational: true } : { value: "5,000 ft", isNational: true };
 }
-
-const asBool = (v: any) => v === true || v === 1 || v === "1" || v === "t";
 
 /* ----------------------------- SEO & METADATA ----------------------------- */
 
@@ -355,18 +348,14 @@ export default async function AirportPage({ params }: Props) {
           {airport.wikipedia_link && <KV k="Wikipedia" v={<a href={airport.wikipedia_link} target="_blank" style={{ color: "inherit" }}>Open Article</a>} />}
         </Card>
 
-        {/* 4. PILOT TOOLBOX */}
-        <Card title="Pilot Toolbox" subtitle="External charts, live tracking and satellite imagery.">
+{/* 4. PILOT TOOLBOX */}
+        <Card title="Pilot Toolbox" subtitle="External charts, live tracking and weather reports.">
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <a href={skyVectorLink(airport.ident)} target="_blank" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px", border: "1px solid var(--border)", borderRadius: 12, textDecoration: "none", color: "var(--foreground)", fontWeight: 700, background: "rgba(255,255,255,0.02)" }}>
-               🗺️ SkyVector Charts
-            </a>
-            <a href={flightAwareLink(airport.ident)} target="_blank" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px", border: "1px solid var(--border)", borderRadius: 12, textDecoration: "none", color: "var(--foreground)", fontWeight: 700, background: "rgba(255,255,255,0.02)" }}>
-               📡 FlightAware Live
-            </a>
-            <a href={googleMapsSatellite(airport.latitude_deg, airport.longitude_deg)} target="_blank" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px", border: "1px solid var(--border)", borderRadius: 12, textDecoration: "none", color: "var(--foreground)", fontWeight: 700, gridColumn: "span 2", background: "rgba(255,255,255,0.02)" }}>
-               🌍 Google Maps Satellite View (Runway Check)
-            </a>
+            <a href={skyVectorLink(airport.ident)} target="_blank" style={{ padding: "12px", border: "1px solid var(--border)", borderRadius: 12, textAlign: "center", textDecoration: "none", color: "inherit", fontWeight: 700 }}>🗺️ SkyVector Charts</a>
+            <a href={flightAwareLink(airport.ident)} target="_blank" style={{ padding: "12px", border: "1px solid var(--border)", borderRadius: 12, textAlign: "center", textDecoration: "none", color: "inherit", fontWeight: 700 }}>📡 FlightAware Live</a>
+            <a href={checkWxLink(airport.ident)} target="_blank" style={{ padding: "12px", border: "1px solid var(--border)", borderRadius: 12, textAlign: "center", textDecoration: "none", color: "inherit", fontWeight: 700 }}>🌡️ Live METAR</a>
+            <a href={metarTafLink(airport.ident)} target="_blank" style={{ padding: "12px", border: "1px solid var(--border)", borderRadius: 12, textAlign: "center", textDecoration: "none", color: "inherit", fontWeight: 700 }}>🌦️ TAF Forecast</a>
+            <a href={googleMapsSatellite(airport.latitude_deg, airport.longitude_deg)} target="_blank" style={{ padding: "12px", border: "1px solid var(--border)", borderRadius: 12, textAlign: "center", textDecoration: "none", color: "inherit", fontWeight: 700, gridColumn: "span 2" }}>🌍 Satellite View</a>
           </div>
         </Card>
 
