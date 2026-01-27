@@ -1,9 +1,10 @@
 // web/app/page.tsx
 import type { Metadata } from "next";
 import Link from "next/link";
+import { headers } from "next/headers";
 import AirportSearch from "@/app/components/AirportSearch";
 import NearbyAirports from "@/app/components/NearbyAirports";
-import { sql } from "@/lib/db"; // Für den dynamischen Länder-Abruf
+import { Plane, Helicopter, Globe, ShieldCheck, Zap, Radio, Map } from "lucide-react";
 
 export const runtime = "nodejs";
 
@@ -12,38 +13,64 @@ const SITE_URL = "https://www.airportlookup.com";
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "MSFS 2024 Airport Lookup — ILS, Runways & Navaids (PS5 / Xbox / PC)",
+    default: "MSFS 2024 Global Airport Lookup — ILS, Runways & Navaids",
     template: "%s · Airport Lookup",
   },
   description:
-    "Fast technical reference for Microsoft Flight Simulator 2024 (PS5, Xbox, PC). Global runway data, verified US ILS frequencies (FAA), and radio comms.",
+    "Fast technical reference for Microsoft Flight Simulator 2024. Verified AIP 2026 ILS frequencies, runway lighting, and radio comms for 40,000+ airports worldwide.",
   alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    url: "/",
+    title: "Global MSFS Airport Lookup (Runways, Lights, ILS Frequencies)",
+    description: "Search 40,000+ airports with verified 2026 AIP data for MSFS 2024.",
+    siteName: "Airport Lookup",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "MSFS Global Airport Lookup",
+    description: "Verified 2026 ILS frequencies and runway data for flight simulation.",
+  },
   robots: { index: true, follow: true },
 };
 
-// Verifizierte US-Hubs (FAA Daten) 
-const US_ILS_HUBS = [
-  { code: "KJFK", label: "New York (KJFK)" },
-  { code: "KLAX", label: "Los Angeles (KLAX)" },
-  { code: "KORD", label: "Chicago (KORD)" },
-  { code: "KATL", label: "Atlanta (KATL)" },
-  { code: "KSFO", label: "San Francisco (KSFO)" },
-  { code: "KSEA", label: "Seattle (KSEA)" },
-  { code: "KMIA", label: "Miami (KMIA)" },
-  { code: "KDFW", label: "Dallas (KDFW)" },
+// Globale Hubs mit Typ-Logik für Icons
+const EXAMPLES = [
+  { code: "KJFK", label: "New York", type: "large_airport" },
+  { code: "EDDF", label: "Frankfurt", type: "large_airport" },
+  { code: "EGLL", label: "London", type: "large_airport" },
+  { code: "OMDB", label: "Dubai", type: "large_airport" },
+  { code: "RJTT", label: "Tokyo", type: "large_airport" },
+  { code: "FACT", label: "Cape Town", type: "large_airport" },
+  { code: "YSSY", label: "Sydney", type: "large_airport" },
+  { code: "SBGR", label: "São Paulo", type: "large_airport" },
 ];
 
+const COUNTRY_HUB_MAP: Record<string, { code: string; label: string }> = {
+  DE: { code: "EDDF", label: "Frankfurt" },
+  AT: { code: "LOWW", label: "Vienna" },
+  CH: { code: "LSZH", label: "Zurich" },
+  GB: { code: "EGLL", label: "London" },
+  US: { code: "KJFK", label: "New York" },
+  FR: { code: "LFPG", label: "Paris" },
+  JP: { code: "RJTT", label: "Tokyo" },
+  AU: { code: "YSSY", label: "Sydney" },
+};
+
 export default async function Home() {
-  // Wir holen uns die Top-Länder mit den meisten Flughäfen für die SEO-Sektion
-  const topCountries = await sql`
-    SELECT c.code, c.name, COUNT(a.id) as count
-    FROM countries c
-    JOIN airports a ON c.code = a.iso_country
-    WHERE a.type IN ('large_airport', 'medium_airport')
-    GROUP BY c.code, c.name
-    ORDER BY count DESC
-    LIMIT 24
-  `;
+  const headerList = await headers();
+  const countryCode = headerList.get("x-vercel-ip-country") || "US";
+  const localHub = COUNTRY_HUB_MAP[countryCode] || COUNTRY_HUB_MAP["US"];
+
+  const getIcon = (type: string) => {
+    switch (type) {
+      case "large_airport": return <Plane className="w-4 h-4 text-blue-600 shrink-0" />;
+      case "medium_airport": return <Plane className="w-4 h-4 text-emerald-600 shrink-0" />;
+      case "small_airport": return <Plane className="w-3.5 h-3.5 text-amber-600 shrink-0" />;
+      case "heliport": return <Helicopter className="w-4 h-4 text-purple-600 shrink-0" />;
+      default: return <Plane className="w-4 h-4 text-neutral-400 shrink-0" />;
+    }
+  };
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -59,46 +86,58 @@ export default async function Home() {
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-10">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       {/* Hero Section */}
       <section className="mb-8">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="bg-emerald-500/10 text-emerald-600 text-[10px] font-black px-2 py-1 rounded-md border border-emerald-500/20 uppercase tracking-widest">
+            Verified AIP 2026 Global Data
+          </span>
+        </div>
         <h1 className="text-4xl font-extrabold tracking-tight text-neutral-900 dark:text-neutral-100">
-          MSFS 2024 Airport Lookup
+          Global MSFS Airport Lookup
         </h1>
         <p className="mt-3 text-lg text-neutral-700 dark:text-neutral-300">
-          The essential <strong>flight simulator reference</strong> for pilots on <strong>PS5, Xbox, and PC</strong>. 
-          Get instant access to technical runway data, lighting systems, and radio frequencies. 
-          Verified <strong>ILS approach data</strong> for US airports. Optimized for <strong>MSFS 2024</strong>.
+          The essential <strong>flight simulator reference</strong> for pilots. Get instant access to 
+          runway data, lighting systems, and verified <strong>ILS frequencies</strong> for over 40,000 airports worldwide. 
+          Optimized for <strong>MSFS 2024</strong>.
         </p>
       </section>
 
-      {/* Search & Strategic Hubs Card */}
+      {/* Search & Examples Card */}
       <section className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 shadow-sm">
         <AirportSearch />
         
         <p className="mt-4 text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
-          Airport Lookup is a specialized reference tool for the sim community. We provide 
-          <strong> verified ILS frequencies</strong>, runway lighting badges, and essential ATC comms. 
-          Search over 40,000 airports worldwide by ICAO or IATA code.
+          Airport Lookup is a specialized MSFS reference tool. We provide <strong>AIP 2026 verified 
+          ILS data</strong>, runway lighting badges, and essential comms (TWR/GND/APP). 
+          Search by ICAO or IATA to access canonical data for every continent.
         </p>
 
-        {/* Global Hubs (Verified US Data) */}
+        {/* Global Examples */}
         <div className="mt-8">
-          <div className="mb-3 text-xs font-bold uppercase tracking-widest text-neutral-500">
-            Verified US ILS Hubs (FAA Data)
+          <div className="flex items-center gap-2 mb-3 text-xs font-bold uppercase tracking-widest text-neutral-500">
+            <Globe className="w-3 h-3" /> Worldwide Hubs & Popular Searches
           </div>
           <div className="flex flex-wrap gap-2">
-            {US_ILS_HUBS.map((x) => (
+            {/* IP-basierter Vorschlag */}
+            <Link
+              href={`/airports/${localHub.code}`}
+              className="flex items-center gap-2 rounded-xl border-2 border-blue-500/20 bg-blue-500/5 px-4 py-2 text-sm font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 transition-all"
+            >
+              <ShieldCheck className="w-4 h-4" /> 
+              Your Region: {localHub.label} ({localHub.code})
+            </Link>
+
+            {EXAMPLES.map((x) => (
               <Link
                 key={x.code}
                 href={`/airports/${x.code}`}
-                className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 px-4 py-2 text-sm font-medium text-neutral-900 dark:text-neutral-100 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200 transition-all"
+                className="flex items-center gap-2 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 px-4 py-2 text-sm font-medium text-neutral-900 dark:text-neutral-100 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200 transition-all"
               >
-                {x.label}
+                {getIcon(x.type)}
+                {x.label} ({x.code})
               </Link>
             ))}
           </div>
@@ -108,101 +147,68 @@ export default async function Home() {
       {/* Dynamic Nearby Feature */}
       <NearbyAirports />
 
-      {/* SEO Text Block - Fokus auf PS5 & SimBrief */}
-      <section className="mt-16 border-l-4 border-blue-500 pl-6 py-2">
-          <h2 className="text-2xl font-bold mb-4">Master your MSFS 2024 Flight Plan on PS5 & Xbox</h2>
+      {/* SEO Text Block */}
+      <section className="mt-16 border-l-4 border-emerald-500 pl-6 py-2">
+          <h2 className="text-2xl font-bold mb-4">Precision for your MSFS Flight Plan</h2>
           <p className="text-neutral-600 dark:text-neutral-400 leading-relaxed max-w-3xl">
-            Whether you are flying a complex approach into <strong>New York (KJFK)</strong> on your 
-            <strong> PS5</strong> or exploring remote airfields on PC, our database provides the 
-            critical instrument data you need. We bridge the gap for <strong>SimBrief</strong> and 
-            <strong> VATSIM</strong> pilots by providing <strong>Localizer Courses</strong> and 
-            <strong> runway lighting status</strong> at a glance. Perfect for console simmers who 
-            need a fast technical reference on a second screen.
+            Whether you are flying a heavy jet into <strong>Frankfurt (EDDF)</strong> or a small bush plane 
+            into a remote airstrip, our database provides critical info for a successful landing. 
+            We now offer <strong>global coverage</strong> including verified 2026 ILS frequencies, 
+            approach lighting (PAPI/VASI), and Navaids (VOR/NDB) for the virtual skies. 
+            Perfect for <strong>Xbox and PS5 simmers</strong> needing fast data on a second screen.
           </p>
-      </section>
-
-      {/* Browse by Country Section */}
-      <section className="mt-16">
-        <h2 className="text-2xl font-bold mb-6 text-neutral-900 dark:text-neutral-100">Browse Airports by Country</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-          {topCountries.map((c: any) => (
-            <Link
-              key={c.code}
-              href={`/countries/${c.code.toLowerCase()}`}
-              className="group flex flex-col p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:border-blue-500 transition-all shadow-sm"
-            >
-              <span className="text-sm font-bold text-neutral-900 dark:text-neutral-100 group-hover:text-blue-500">{c.name}</span>
-              <span className="text-xs text-neutral-500 mt-1">{numFmt(c.count)} Hubs</span>
-            </Link>
-          ))}
-        </div>
-
-        {/* NEU: Link zu allen Ländern */}
-        <div className="mt-8 text-center">
-          <Link 
-            href="/countries" 
-            className="inline-flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-500 transition-colors"
-          >
-            View all countries and regions worldwide →
-          </Link>
-        </div>
       </section>
 
       {/* Feature Value Props */}
-      <section className="mt-16 grid gap-6 md:grid-cols-3">
+      <section className="mt-12 grid gap-6 md:grid-cols-3">
         <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6">
+          <Zap className="w-6 h-6 text-emerald-500 mb-3" />
           <h3 className="font-bold text-neutral-900 dark:text-white">Runway & ILS</h3>
           <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
-            Accurate lengths, surfaces, and <strong>verified ILS frequencies</strong> (FAA NASR) for US hubs.
+            Accurate lengths, surface types, and verified 2026 ILS/Localizer data for MSFS 2024.
           </p>
         </div>
 
         <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6">
-          <h3 className="font-bold text-neutral-900 dark:text-white">Radio Frequencies</h3>
+          <Radio className="w-6 h-6 text-blue-500 mb-3" />
+          <h3 className="font-bold text-neutral-900 dark:text-white">Global Comms</h3>
           <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
-            Quickly find TWR, GND, delivery, and ATIS frequencies for global airports.
+            Quick access to TWR, GND, and ATIS frequencies for over 40,000 airports worldwide.
           </p>
         </div>
 
         <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6">
-          <h3 className="font-bold text-neutral-900 dark:text-white">Navaid DB</h3>
+          <Map className="w-6 h-6 text-amber-500 mb-3" />
+          <h3 className="font-bold text-neutral-900 dark:text-white">Verified Navaids</h3>
           <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
-            Full reference for VOR, NDB, and DME stations with precise coordinates and frequencies.
+            Worldwide VOR, NDB, and DME stations with coordinates and frequency data.
           </p>
         </div>
       </section>
 
-      {/* Data Transparency & Disclaimer */}
+      {/* Transparency & Disclaimer */}
       <section className="mt-8 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-100/50 dark:bg-neutral-900/50 p-6">
         <h3 className="text-sm font-bold text-neutral-900 dark:text-white uppercase tracking-wider">
           Data Sources & Accuracy
         </h3>
         <p className="mt-2 text-sm text-neutral-700 dark:text-neutral-300">
-          Airport metadata is sourced from <strong>OurAirports</strong> (Public Domain). 
-          Instrument Approach Data (ILS) for the United States is provided by <strong>FAA NASR</strong> 
-          (National Airspace System Resources). 
+          Airport metadata is sourced from <strong>OurAirports</strong>. Global ILS frequencies 
+          are verified using <strong>AIP 2026</strong> datasets. 
           Reference only — not for real-world navigation.
         </p>
       </section>
 
-      {/* SEO Internal Link Footer - Nur US-Links (Verified) */}
+      {/* Footer Links */}
       <section className="mt-12 pt-8 border-t border-neutral-200 dark:border-neutral-800">
-        <div className="text-xs font-bold text-neutral-500 uppercase mb-4">Verified US Runway Lights & ILS Comms</div>
+        <div className="text-xs font-bold text-neutral-500 uppercase mb-4">Global Hub Quick Links (Verified ILS)</div>
         <div className="flex flex-wrap gap-x-6 gap-y-3 text-xs">
-          {US_ILS_HUBS.map((x) => (
+          {EXAMPLES.map((x) => (
             <Link key={x.code} href={`/airports/${x.code}`} className="text-neutral-600 dark:text-neutral-400 hover:text-blue-600 underline underline-offset-4">
-              {x.code} ILS Freq & Runway Lighting
+              {x.code} {x.label} ILS & Comms
             </Link>
           ))}
         </div>
       </section>
     </main>
   );
-}
-
-// Helper für Tausendertrenner (Hydration-Safe) 
-function numFmt(n: number | string | null | undefined): string {
-  const x = Number(n);
-  if (!Number.isFinite(x)) return "0";
-  return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
