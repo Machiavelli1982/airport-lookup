@@ -1,185 +1,200 @@
 // web/app/countries/[code]/page.tsx
-
+import { sql } from "@/lib/db";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { sql } from "@/lib/db";
-import type { ReactNode } from "react";
+import { 
+  Plane, 
+  Helicopter, 
+  ChevronLeft, 
+  MapPin, 
+  ShieldCheck,
+  Globe
+} from "lucide-react";
 
 export const runtime = "nodejs";
 export const revalidate = 86400; // 24h
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") || "https://www.airportlookup.com";
-
-/* ----------------------------- TYPES ----------------------------- */
-
-interface Country {
-  code: string;
-  name: string;
-}
-
-interface AirportSummary {
-  ident: string;
-  iata_code: string | null;
-  name: string;
-  municipality: string | null;
-  type: string;
-}
-
-/* ----------------------------- HELPERS ----------------------------- */
-
-function norm(code: string | undefined | null) {
-  return (code ?? "").trim().toUpperCase();
-}
-
-function numFmt(n: number | string | null | undefined): string {
-  const x = Number(n);
-  if (!Number.isFinite(x)) return "0";
-  return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-}
+const SITE_URL = "https://www.airportlookup.com";
 
 /* ----------------------------- SEO & METADATA ----------------------------- */
 
-type Props = { params: Promise<{ code: string }> };
+type Props = { 
+  params: Promise<{ code: string }>;
+  searchParams: Promise<{ type?: string }>;
+};
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { code: rawCode } = await params;
-  const code = norm(rawCode);
+  const code = rawCode.toUpperCase();
   
-  try {
-    const rows = await sql<Country[]>`SELECT name FROM countries WHERE code = ${code} LIMIT 1`;
-    const country = rows?.[0];
-    
-    if (!country) return { title: "Country Not Found" };
+  const country = (await sql`SELECT name FROM countries WHERE code = ${code} LIMIT 1`)[0];
+  if (!country) return { title: "Country Not Found" };
 
-    const title = `Airports in ${country.name} — MSFS 2024 Technical Reference`;
-    const description = `Complete list of airports in ${country.name}. Technical data including ILS frequencies, runway lighting, and ATC comms for MSFS 2024 and SimBrief.`;
-
-    return {
-      metadataBase: new URL(SITE_URL),
-      title,
-      description,
-      alternates: { canonical: `/countries/${code}` },
-    };
-  } catch (e) {
-    return { title: "Browse Airports" };
-  }
+  return {
+    title: `${country.name} MSFS Airports — Runway & ILS Data`,
+    description: `Technical database for MSFS 2024: Browse all airports in ${country.name}. Verified ILS frequencies, runway lighting, and radio comms.`,
+    alternates: { canonical: `/countries/${code.toLowerCase()}` },
+  };
 }
 
-/* ------------------------------ UI COMPONENTS ---------------------------- */
+/* ----------------------------- COMPONENT ----------------------------- */
 
-function Card({ title, subtitle, children }: { title: string; subtitle?: string; children?: ReactNode }) {
-  return (
-    <section style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 18, padding: 18, boxShadow: "0 2px 10px rgba(0,0,0,0.04)" }}>
-      <h2 style={{ fontSize: 22, margin: 0, color: "var(--foreground)", fontWeight: 700 }}>{title}</h2>
-      {subtitle && <p style={{ margin: "6px 0 0", color: "var(--muted)", fontWeight: 500, fontSize: 14 }}>{subtitle}</p>}
-      <div style={{ marginTop: 14 }}>{children}</div>
-    </section>
-  );
-}
+export default async function CountryPage(props: Props) {
+  const { code: rawCode } = await props.params;
+  const code = rawCode.toUpperCase();
+  const searchParams = await props.searchParams;
+  
+  // Aktueller Filter (Default: Large Airports / Hubs)
+  const currentType = searchParams.type || 'large_airport';
 
-/* ------------------------------ MAIN PAGE ------------------------------- */
-
-export default async function CountryPage({ params }: Props) {
-  const { code: rawCode } = await params;
-  const code = norm(rawCode);
-  if (!code) notFound();
-
-  // Country Name & Top Airports parallel abrufen
-  const [countryRows, airportRows] = await Promise.all([
-    sql<Country[]>`SELECT * FROM countries WHERE code = ${code} LIMIT 1`,
-    sql<AirportSummary[]>`
-      SELECT ident, iata_code, name, municipality, type
-      FROM airports
+  // Länder-Infos und Statistiken parallel laden
+  const [country, stats] = await Promise.all([
+    sql`SELECT name FROM countries WHERE code = ${code} LIMIT 1`,
+    sql`
+      SELECT 
+        COUNT(id) FILTER (WHERE type = 'large_airport') as large_count,
+        COUNT(id) FILTER (WHERE type = 'medium_airport') as medium_count,
+        COUNT(id) FILTER (WHERE type = 'small_airport') as small_count,
+        COUNT(id) FILTER (WHERE type = 'heliport') as heli_count
+      FROM airports 
       WHERE iso_country = ${code}
-        AND type IN ('large_airport', 'medium_airport', 'small_airport')
-      ORDER BY 
-        CASE type 
-          WHEN 'large_airport' THEN 1 
-          WHEN 'medium_airport' THEN 2 
-          WHEN 'small_airport' THEN 3 
-          ELSE 4 
-        END ASC,
-        name ASC
     `
   ]);
 
-  const country = countryRows?.[0];
-  if (!country) notFound();
+  if (!country[0]) notFound();
 
-  // Statistiken für SEO-Text
-  const largeCount = airportRows.filter(a => a.type === 'large_airport').length;
-  const mediumCount = airportRows.filter(a => a.type === 'medium_airport').length;
+  // Flughäfen basierend auf dem gewählten Filter laden
+  const airports = await sql`
+    SELECT 
+      ident, 
+      iata_code, 
+      name, 
+      municipality, 
+      type,
+      EXISTS (
+        SELECT 1 FROM runway_ils 
+        WHERE airport_ident = airports.ident
+      ) as has_ils
+    FROM airports 
+    WHERE iso_country = ${code} 
+    AND type = ${currentType}
+    ORDER BY (iata_code IS NOT NULL) DESC, name ASC
+    LIMIT 1000
+  `;
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "ItemList",
-    "name": `Airports in ${country.name}`,
-    "itemListElement": airportRows.slice(0, 20).map((a, index) => ({
-      "@type": "ListItem",
-      "position": index + 1,
-      "url": `${SITE_URL}/airports/${a.ident}`,
-      "name": `${a.ident} - ${a.name}`
-    }))
+  // Icon-Logik identisch zur Suche
+  const getIcon = (type: string) => {
+    switch (type) {
+      case "large_airport": return <Plane className="w-5 h-5 text-blue-600" />;
+      case "medium_airport": return <Plane className="w-4 h-4 text-emerald-600" />;
+      case "small_airport": return <Plane className="w-3.5 h-3.5 text-amber-600" />;
+      case "heliport": return <Helicopter className="w-4 h-4 text-purple-600" />;
+      default: return <Plane className="w-4 h-4 text-neutral-400" />;
+    }
   };
 
+  const tabs = [
+    { id: 'large_airport', label: 'Major Hubs', count: stats[0].large_count },
+    { id: 'medium_airport', label: 'Regional', count: stats[0].medium_count },
+    { id: 'small_airport', label: 'Small Airfields', count: stats[0].small_count },
+    { id: 'heliport', label: 'Heliports', count: stats[0].heli_count },
+  ];
+
   return (
-    <main style={{ padding: 18, maxWidth: 900, margin: "0 auto", fontFamily: "system-ui" }}>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-
-      <div style={{ marginBottom: 12 }}>
-        <Link href="/" style={{ color: "var(--foreground)", textDecoration: "none", fontWeight: 600 }}>← Back to Overview</Link>
-      </div>
-
-      <h1 style={{ fontSize: 44, margin: "8px 0 2px", fontWeight: 800 }}>Airports in {country.name}</h1>
-      <p style={{ margin: "0 0 24px", fontSize: 18, color: "var(--muted)", fontWeight: 500 }}>
-        Browse {numFmt(airportRows.length)} airports in {country.name}. Get technical landing data for MSFS 2024.
-      </p>
-
-      {/* SEO Text Block */}
-      <section style={{ marginBottom: 30, borderLeft: "4px solid #3b82f6", paddingLeft: 16 }}>
-        <p style={{ color: "var(--muted)", lineHeight: 1.6 }}>
-          Complete database for flight simulator pilots flying in <strong>{country.name}</strong>. 
-          This list includes <strong>{largeCount} major hubs</strong> and {mediumCount} regional airports. 
-          Perfect for planning VATSIM routes or SimBrief flight plans on PS5, Xbox, and PC. 
-          Select an airport below to view detailed <strong>ILS frequencies</strong>, runway lighting status, and ATC frequencies.
+    <main className="mx-auto w-full max-w-5xl px-4 py-10">
+      {/* Navigation & Header */}
+      <div className="mb-8">
+        <Link href="/countries" className="flex items-center gap-1 text-sm font-bold text-neutral-500 hover:text-blue-600 transition-colors mb-6">
+          <ChevronLeft className="w-4 h-4" /> Back to Countries
+        </Link>
+        
+        <div className="flex items-center gap-3 mb-2">
+          <Globe className="w-6 h-6 text-blue-500" />
+          <h1 className="text-4xl font-black text-neutral-900 dark:text-white">
+            {country[0].name}
+          </h1>
+        </div>
+        <p className="text-neutral-500 font-medium">
+          Technical MSFS database for {country[0].name}. Verified FAA and AIP 2026 data.
         </p>
-      </section>
-
-      <div style={{ display: "grid", gap: 14 }}>
-        <Card title="Major Hubs & Regional Airports" subtitle={`ICAO / IATA reference for ${country.name}`}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
-            {airportRows.map((a) => (
-              <Link 
-                key={a.ident} 
-                href={`/airports/${a.ident}`}
-                style={{ 
-                  textDecoration: "none", 
-                  color: "inherit",
-                  padding: "12px",
-                  borderRadius: "12px",
-                  border: "1px solid var(--border)",
-                  background: "rgba(255,255,255,0.02)",
-                  display: "flex",
-                  flexDirection: "column",
-                  transition: "border-color 0.2s"
-                }}
-                className="hover-card"
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                  <span style={{ fontWeight: 800, fontSize: 18 }}>{a.ident}</span>
-                  {a.iata_code && <span style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>{a.iata_code}</span>}
-                </div>
-                <span style={{ fontSize: 14, fontWeight: 600, marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.name}</span>
-                <span style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{a.municipality || "—"}</span>
-              </Link>
-            ))}
-          </div>
-        </Card>
       </div>
 
-      <footer style={{ marginTop: 40, paddingTop: 20, borderTop: "1px solid var(--border)", textAlign: "center", fontSize: 12, color: "var(--muted)" }}>
-        Technical data for MSFS 2024 Console & PC. Sourced from OurAirports Public Domain data.
+      {/* Filter Tabs - Entscheidend für Performance bei >16.000 Einträgen */}
+      <div className="flex gap-2 mb-8 overflow-x-auto pb-4 no-scrollbar">
+        {tabs.map((tab) => (
+          <Link
+            key={tab.id}
+            href={`/countries/${code.toLowerCase()}?type=${tab.id}`}
+            className={`flex items-center gap-3 px-5 py-3 rounded-2xl text-sm font-bold transition-all border whitespace-nowrap ${
+              currentType === tab.id 
+              ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20' 
+              : 'bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:border-blue-300'
+            }`}
+          >
+            {tab.label}
+            <span className={`px-2 py-0.5 rounded-lg text-[10px] ${
+              currentType === tab.id ? 'bg-white/20 text-white' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500'
+            }`}>
+              {Number(tab.count).toLocaleString()}
+            </span>
+          </Link>
+        ))}
+      </div>
+
+      {/* Airport Grid */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {airports.length > 0 ? (
+          airports.map((a) => (
+            <Link 
+              key={a.ident} 
+              href={`/airports/${a.ident}`} 
+              className="group flex items-center gap-4 p-4 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md transition-all"
+            >
+              {/* Icon Container */}
+              <div className="w-12 h-12 rounded-xl bg-neutral-50 dark:bg-neutral-800 flex items-center justify-center shrink-0 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 transition-colors">
+                {getIcon(a.type)}
+              </div>
+
+              {/* Info Area */}
+              <div className="min-w-0 flex-grow">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="font-bold text-neutral-900 dark:text-white group-hover:text-blue-600 transition-colors">
+                    {a.ident}
+                  </span>
+                  {a.iata_code && (
+                    <span className="text-[10px] font-bold text-neutral-400 border border-neutral-200 dark:border-neutral-700 px-1 rounded">
+                      {a.iata_code}
+                    </span>
+                  )}
+                  {a.has_ils && (
+                    <span className="flex items-center gap-0.5 text-[9px] font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/20 uppercase tracking-tighter">
+                      <ShieldCheck className="w-2.5 h-2.5" /> ILS
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs font-bold text-neutral-600 dark:text-neutral-300 truncate">
+                  {a.name}
+                </div>
+                <div className="text-[10px] text-neutral-400 uppercase font-bold tracking-tight truncate flex items-center gap-1">
+                  <MapPin className="w-2.5 h-2.5" /> {a.municipality || 'Unknown Region'}
+                </div>
+              </div>
+            </Link>
+          ))
+        ) : (
+          <div className="col-span-full py-20 text-center rounded-3xl border-2 border-dashed border-neutral-100 dark:border-neutral-800">
+            <p className="text-neutral-500 font-medium italic">No airports of this type found in this region.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Footer Disclaimer */}
+      <footer className="mt-16 pt-8 border-t border-neutral-200 dark:border-neutral-800 text-center">
+        <p className="text-xs text-neutral-500 font-medium leading-relaxed">
+          Technical landing data for <strong>{country[0].name}</strong> is compiled using FAA NASR (US) and researched AIP 2026 (Global) datasets. <br />
+          Data for simulation only — not for real-world navigation.
+        </p>
       </footer>
     </main>
   );
