@@ -394,38 +394,51 @@ export default async function AirportPage({ params }: Props) {
           </div>
         </Card>
 
-        {/* 5. RUNWAYS & ILS APPROACH DATA */}
-        <Card title="Runways & ILS Approach Data" subtitle="Detailed dimensions and instrument landing frequencies.">
-          {runways.map((r) => {
-            const ils = ilsData?.find((i) => i.runway_ident === r.le_ident || i.runway_ident === r.he_ident);
-            return (
-              <div key={r.id} id={`runway-${r.le_ident}`} style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 16, marginBottom: 12, background: "rgba(255,255,255,0.01)", scrollMarginTop: 20 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, alignItems: "center" }}>
-                  <span style={{ fontWeight: 800, fontSize: 20 }}>Runway {r.le_ident} / {r.he_ident}</span>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    {ils && <Badge text="ILS" tone="ok" />}
-                    <Badge text={asBool(r.lighted) ? "LIGHTED" : "UNLIT"} tone={asBool(r.lighted) ? "ok" : "muted"} />
-                  </div>
-                </div>
-                <div style={{ color: "var(--muted)", fontWeight: 600, fontSize: 14, lineHeight: "1.6" }}>
-                  <strong>Length:</strong> {numFmt(r.length_ft)} ft / {fmtM(r.length_ft)} <br />
-                  <strong>Width:</strong> {numFmt(r.width_ft)} ft / {fmtM(r.width_ft)} <br />
-                  <strong>Surface:</strong> {surfaceLabel(r.surface)} <br />
-                  <strong>Heading:</strong> {r.le_heading_degt ?? "—"}° / {r.he_heading_degt ?? "—"}°
-                </div>
-                {ils && (
-                  <div style={{ marginTop: 14, padding: 14, background: "rgba(34,197,94,0.05)", borderRadius: 10, border: "1px solid rgba(34,197,94,0.15)" }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-                      <div><div style={{ fontSize: 10, color: "var(--muted)", fontWeight: 800 }}>ILS FREQUENCY</div><div style={{ fontWeight: 800, fontFamily: "monospace", fontSize: 16 }}>{Number(ils.ils_freq).toFixed(2)} MHz</div></div>
-                      <div><div style={{ fontSize: 10, color: "var(--muted)", fontWeight: 800 }}>ILS IDENT</div><div style={{ fontWeight: 800, fontFamily: "monospace", fontSize: 16 }}>{ils.ils_ident}</div></div>
-                      <div><div style={{ fontSize: 10, color: "var(--muted)", fontWeight: 800 }}>LOCALIZER COURSE</div><div style={{ fontWeight: 800, fontFamily: "monospace", fontSize: 16 }}>{Number(ils.ils_course).toFixed(0)}°</div></div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </Card>
+{/* 5. RUNWAYS & ILS APPROACH DATA */}
+<Card title="Runways & ILS Approach Data" subtitle="Detailed dimensions and instrument landing frequencies.">
+  {runways.map((r) => {
+    // Suche gezielt nach ILS für beide Enden des Runway-Paars
+    const ilsLe = ilsData?.find((i) => i.runway_ident === r.le_ident);
+    const ilsHe = ilsData?.find((i) => i.runway_ident === r.he_ident);
+
+    return (
+      <div key={r.id} id={`runway-${r.le_ident}`} style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 16, marginBottom: 12, background: "rgba(255,255,255,0.01)", scrollMarginTop: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, alignItems: "center" }}>
+          <span style={{ fontWeight: 800, fontSize: 20 }}>Runway {r.le_ident} / {r.he_ident}</span>
+          <div style={{ display: "flex", gap: 6 }}>
+            {(ilsLe || ilsHe) && <Badge text="ILS EQUIPPED" tone="ok" />}
+            <Badge text={asBool(r.lighted) ? "LIGHTED" : "UNLIT"} tone={asBool(r.lighted) ? "ok" : "muted"} />
+          </div>
+        </div>
+        
+        {/* Basis-Daten */}
+        <div style={{ color: "var(--muted)", fontWeight: 600, fontSize: 14, lineHeight: "1.6", marginBottom: 12 }}>
+          <strong>Dimensions:</strong> {numFmt(r.length_ft)} x {numFmt(r.width_ft)} ft ({surfaceLabel(r.surface)})
+        </div>
+
+        {/* ILS Display für BEIDE Seiten */}
+        <div style={{ display: "grid", gap: 10, gridTemplateColumns: "1fr 1fr" }}>
+          {[
+            { id: r.le_ident, data: ilsLe, hdg: r.le_heading_degt },
+            { id: r.he_ident, data: ilsHe, hdg: r.he_heading_degt }
+          ].map((side) => (
+            <div key={side.id} style={{ padding: 12, background: side.data ? "rgba(34,197,94,0.05)" : "rgba(255,255,255,0.02)", borderRadius: 10, border: side.data ? "1px solid rgba(34,197,94,0.15)" : "1px solid var(--border)" }}>
+              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>RWY {side.id} {side.hdg ? `(${side.hdg}°)` : ""}</div>
+              {side.data ? (
+                <>
+                  <div style={{ fontFamily: "monospace", fontSize: 15, fontWeight: 800 }}>{Number(side.data.ils_freq).toFixed(2)} MHz</div>
+                  <div style={{ fontSize: 10, color: "var(--muted)" }}>ID: {side.data.ils_ident} | CRS: {Number(side.data.ils_course).toFixed(0)}°</div>
+                </>
+              ) : (
+                <div style={{ fontSize: 10, color: "var(--muted)", fontStyle: "italic" }}>No ILS / Visual Only</div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  })}
+</Card>
 
         {/* 6. COMMUNICATION FREQUENCIES */}
         <Card title="Communication Frequencies" subtitle="Air traffic control and advisory channels.">
