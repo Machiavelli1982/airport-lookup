@@ -397,7 +397,7 @@ export default async function AirportPage({ params }: Props) {
 {/* 5. RUNWAYS & ILS APPROACH DATA */}
 <Card title="Runways & ILS Approach Data" subtitle="Detailed dimensions and instrument landing frequencies.">
   {runways.map((r) => {
-    // Suche gezielt nach ILS für beide Enden des Runway-Paars
+    // Gezielte Suche nach ILS für beide Enden des Runway-Paars
     const ilsLe = ilsData?.find((i) => i.runway_ident === r.le_ident);
     const ilsHe = ilsData?.find((i) => i.runway_ident === r.he_ident);
 
@@ -410,24 +410,27 @@ export default async function AirportPage({ params }: Props) {
             <Badge text={asBool(r.lighted) ? "LIGHTED" : "UNLIT"} tone={asBool(r.lighted) ? "ok" : "muted"} />
           </div>
         </div>
-        
-        {/* Basis-Daten */}
-        <div style={{ color: "var(--muted)", fontWeight: 600, fontSize: 14, lineHeight: "1.6", marginBottom: 12 }}>
-          <strong>Dimensions:</strong> {numFmt(r.length_ft)} x {numFmt(r.width_ft)} ft ({surfaceLabel(r.surface)})
+
+        {/* SEO-Keywords & Technische Daten mit ft/m Umrechnung */}
+        <div style={{ color: "var(--muted)", fontWeight: 600, fontSize: 14, lineHeight: "1.6", marginBottom: 14 }}>
+          <strong>Runway Length:</strong> {numFmt(r.length_ft)} ft / {fmtM(r.length_ft)} <br />
+          <strong>Runway Width:</strong> {numFmt(r.width_ft)} ft / {fmtM(r.width_ft)} <br />
+          <strong>Surface Type:</strong> {surfaceLabel(r.surface)} <br />
+          <strong>Heading:</strong> {r.le_heading_degt ?? "—"}° / {r.he_heading_degt ?? "—"}°
         </div>
 
-        {/* ILS Display für BEIDE Seiten */}
+        {/* ILS Display für BEIDE Seiten - sorgt für maximale Keyword-Relevanz */}
         <div style={{ display: "grid", gap: 10, gridTemplateColumns: "1fr 1fr" }}>
           {[
             { id: r.le_ident, data: ilsLe, hdg: r.le_heading_degt },
             { id: r.he_ident, data: ilsHe, hdg: r.he_heading_degt }
           ].map((side) => (
             <div key={side.id} style={{ padding: 12, background: side.data ? "rgba(34,197,94,0.05)" : "rgba(255,255,255,0.02)", borderRadius: 10, border: side.data ? "1px solid rgba(34,197,94,0.15)" : "1px solid var(--border)" }}>
-              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>RWY {side.id} {side.hdg ? `(${side.hdg}°)` : ""}</div>
+              <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4, color: "var(--foreground)" }}>RWY {side.id} {side.hdg ? `(${side.hdg}°)` : ""}</div>
               {side.data ? (
                 <>
-                  <div style={{ fontFamily: "monospace", fontSize: 15, fontWeight: 800 }}>{Number(side.data.ils_freq).toFixed(2)} MHz</div>
-                  <div style={{ fontSize: 10, color: "var(--muted)" }}>ID: {side.data.ils_ident} | CRS: {Number(side.data.ils_course).toFixed(0)}°</div>
+                  <div style={{ fontFamily: "monospace", fontSize: 15, fontWeight: 800, color: "var(--foreground)" }}>{Number(side.data.ils_freq).toFixed(2)} MHz</div>
+                  <div style={{ fontSize: 10, color: "var(--muted)", fontWeight: 700 }}>IDENT: {side.data.ils_ident} | CRS: {Number(side.data.ils_course).toFixed(0)}°</div>
                 </>
               ) : (
                 <div style={{ fontSize: 10, color: "var(--muted)", fontStyle: "italic" }}>No ILS / Visual Only</div>
